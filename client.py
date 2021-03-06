@@ -3,31 +3,45 @@ from socket import *
 import time
 import json
 
+from messenger.client import Client
+from messenger.client_soket import ClientSoket
+
+ENCODING = 'utf-8'
+
 
 @click.command()
 @click.option('--addr', help='server IP address')
 @click.option('--port', default=7777, help='server TCP port (default - 7777)')
-def connect(addr, port):
-    """Establish a connection to the server"""
+def main(addr, port):
     with socket(AF_INET, SOCK_STREAM) as s:  # Создать сокет TCP
         s.connect((addr, port))  # Соединиться с сервером
+        client_soket = ClientSoket(s)
 
-        request = {
-            'action': 'presence',
-            'time': time.ctime(time.time()),
-            'type': 'status',
-            'user': {
-                "account_name": "tippman",
-                "status": "Yep, I am here!"
-            },
-        }
-        s.send(json.dumps(request).encode("utf-8"))
-
-        response = s.recv(640)
-        data = json.loads(response)
-
-        print(f'Сообщение от сервера: {data["response"]} {data["alert"]}, длиной {len(response)} байт')
-
+# создается сокет клиента и дальнейшая его бработка идет в классе
 
 if __name__ == '__main__':
-    connect()
+    main()
+
+# def connect(addr, port):
+#     """Establish a connection to the server"""
+#     with socket(AF_INET, SOCK_STREAM) as s:  # Создать сокет TCP
+#         s.connect((addr, port))  # Соединиться с сервером
+#
+#         request = {
+#             'action': 'authenticate',
+#             'time': time.ctime(time.time()),
+#             'user': {
+#                 "account_name": "tippman",
+#                 "password": "qwerty1234"
+#             },
+#         }
+#         s.send(json.dumps(request).encode(ENCODING))
+#
+#         response = s.recv(640)
+#         response_str = response.decode(ENCODING)
+#         data = json.loads(response_str)
+#         print(f'Сообщение от сервера: {data["response"]} {data["alert"]}, длиной {len(response)} байт')
+#
+#
+# if __name__ == '__main__':
+#     connect()
