@@ -5,6 +5,7 @@ import json
 
 from messenger.client import Client
 from messenger.client_soket import ClientSoket
+from messenger.messages import Authentificate
 
 ENCODING = 'utf-8'
 
@@ -16,8 +17,10 @@ def main(addr, port):
     with socket(AF_INET, SOCK_STREAM) as s:  # Создать сокет TCP
         s.connect((addr, port))  # Соединиться с сервером
         client_soket = ClientSoket(s)
-
-# создается сокет клиента и дальнейшая его бработка идет в классе
+        client = Client(client_socket=client_soket, account_name='tippman')
+        client.authenticate(password='qwerty12')
+        server_response = client.get_response()
+        print(server_response)
 
 if __name__ == '__main__':
     main()

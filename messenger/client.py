@@ -12,3 +12,8 @@ class Client:
         msg = Authentificate(self._account_name, password)
         data = self._serializer.serialize(msg)
         self._client_socket.send(data)
+
+    def get_response(self):
+        data = self._client_socket.recv()
+        response_msg = self._serializer.deserialize(data)
+        return response_msg

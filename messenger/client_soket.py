@@ -8,7 +8,7 @@ class ClientSoket:
         self._s = sock
 
     def send(self, msg):
-        self._s.send(Serializer().serialize(msg))
+        self._s.send(msg)
 
-    def recv(self, data_size):
-        self._s.recv(data_size)
+    def recv(self, data_size=10000):
+        return self._s.recv(data_size)
