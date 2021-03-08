@@ -24,27 +24,3 @@ def main(addr, port):
 
 if __name__ == '__main__':
     main()
-
-# def connect(addr, port):
-#     """Establish a connection to the server"""
-#     with socket(AF_INET, SOCK_STREAM) as s:  # Создать сокет TCP
-#         s.connect((addr, port))  # Соединиться с сервером
-#
-#         request = {
-#             'action': 'authenticate',
-#             'time': time.ctime(time.time()),
-#             'user': {
-#                 "account_name": "tippman",
-#                 "password": "qwerty1234"
-#             },
-#         }
-#         s.send(json.dumps(request).encode(ENCODING))
-#
-#         response = s.recv(640)
-#         response_str = response.decode(ENCODING)
-#         data = json.loads(response_str)
-#         print(f'Сообщение от сервера: {data["response"]} {data["alert"]}, длиной {len(response)} байт')
-#
-#
-# if __name__ == '__main__':
-#     connect()

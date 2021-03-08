@@ -4,8 +4,11 @@ from socket import *
 import click
 import json
 import time
+import logging
+import log.server_log_config
 
 ENCODING = 'utf-8'
+logger = logging.getLogger('messenger.server')
 
 
 @click.command()
@@ -27,6 +30,7 @@ def main(a, p):
                     "Сообщение: ", request_str,
                     ", было отправлено клиентом: ", addr,
                 )
+                logger.info('server get message, action - %s', data['action'])
 
                 if 'action' in data and data['action'] == 'authenticate':
                     response = {
@@ -35,8 +39,10 @@ def main(a, p):
                         'alert': 'Success connection established!'
                     }
                     client.send(json.dumps(response).encode(ENCODING))
+                    logger.info('success authorise user %s', data['user']['account_name'])
                 elif 'action' in data and data['action'] == 'quit':
                     print('Client disconnected')
+                    logger.info('user %s disconected', data['user']['account_name'])
                     break
 
 
