@@ -22,3 +22,4 @@ class Client:
         response_msg = self._serializer.deserialize(data)
         self.log.info('response code %d', response_msg['response'])
         return response_msg
+#init
