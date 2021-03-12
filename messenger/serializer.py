@@ -1,6 +1,7 @@
 import json
 import time
 from messenger.messages import Authentificate, ServerResponse
+from log.client_log_config import log_fn_info
 
 
 class Serializer:
@@ -10,6 +11,7 @@ class Serializer:
         self._encoding = encoding
         self._get_time_fn = get_time_fn
 
+    @log_fn_info
     def serialize(self, msg):
         if isinstance(msg, Authentificate):
             result_dict = {
@@ -32,5 +34,6 @@ class Serializer:
             result_str = self._dumps(result_dict)
             return result_str.encode(self._encoding)
 
+    @log_fn_info
     def deserialize(self, data):
         return self._loads(data)

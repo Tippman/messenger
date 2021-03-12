@@ -26,10 +26,6 @@ def main(a, p):
                 request = client.recv(10000)
                 request_str = request.decode(ENCODING)
                 data = json.loads(request_str)
-                print(
-                    "Сообщение: ", request_str,
-                    ", было отправлено клиентом: ", addr,
-                )
                 logger.info('server get message, action - %s', data['action'])
 
                 if 'action' in data and data['action'] == 'authenticate':
@@ -41,7 +37,6 @@ def main(a, p):
                     client.send(json.dumps(response).encode(ENCODING))
                     logger.info('success authorise user %s', data['user']['account_name'])
                 elif 'action' in data and data['action'] == 'quit':
-                    print('Client disconnected')
                     logger.info('user %s disconected', data['user']['account_name'])
                     break
 

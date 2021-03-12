@@ -1,4 +1,7 @@
+import inspect
 import logging
+import sys
+from functools import wraps
 
 # Быстрая настройка логгирования может быть выполнена так:
 # logging.basicConfig(filename="gui.log",
@@ -40,7 +43,6 @@ fh = logging.FileHandler("messenger.client.log", encoding='utf-8')
 fh.setLevel(logging.INFO)
 fh.setFormatter(formatter)
 
-
 # Добавляем в логгер новый обработчик событий и устанавливаем уровень логгирования
 logger.addHandler(fh)
 logger.setLevel(logging.INFO)
@@ -56,13 +58,26 @@ logger.setLevel(logging.INFO)
 # | DEBUG            | log.debug(fmt [, *args [, exc_info [, extra]]])
 # -----------------------------------------------------------------------------
 
+# Создаём потоковый обработчик логгирования (по умолчанию sys.stderr):
+logger_func_call = logging.getLogger('messenger.function_call_info')
+log_fn_formatter = logging.Formatter("%(asctime)s %(message)s")
+stream_handler = logging.StreamHandler()
+stream_handler.setLevel(logging.DEBUG)
+stream_handler.setFormatter(log_fn_formatter)
+logger_func_call.addHandler(stream_handler)
+logger_func_call.setLevel(logging.DEBUG)
 
 
-if __name__ == '__main__':
-    # Создаём потоковый обработчик логгирования (по умолчанию sys.stderr):
-    console = logging.StreamHandler()
-    console.setLevel(logging.DEBUG)
-    console.setFormatter(formatter)
-    logger.addHandler(console)
-    # В логгирование передаем имя текущей функции и имя вызвавшей функции
-    logger.info('Тестовый запуск логгирования')
+def log_fn_info(func):
+    """Выводит в поток вывода информацию о вызываемой функции, переданных в нее аргументах,
+    а также имя функции, инициирующей вызов текущей"""
+
+    @wraps(func)
+    def call(*args, **kwargs):
+        insp_stack = inspect.stack()  # получаем стек вызовов вызываемой функции
+        func_call_attrs = inspect.getcallargs(func, *args, **kwargs)  # получаем переданные в функцию параметры
+        logger_func_call.info(
+            f'Функция {func.__name__} была вызвана с параметрами {func_call_attrs} из функции {insp_stack[1].function}\n')
+        return func(*args, **kwargs)
+
+    return call

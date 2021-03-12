@@ -1,11 +1,8 @@
 import click
 from socket import *
-import time
-import json
 
 from messenger.client import Client
 from messenger.client_soket import ClientSoket
-from messenger.messages import Authentificate
 
 ENCODING = 'utf-8'
 
@@ -19,8 +16,8 @@ def main(addr, port):
         client_soket = ClientSoket(s)
         client = Client(client_socket=client_soket, account_name='tippman')
         client.authenticate(password='qwerty12')
-        server_response = client.get_response()
-        print(server_response)
+        client.get_response()
+
 
 if __name__ == '__main__':
     main()
