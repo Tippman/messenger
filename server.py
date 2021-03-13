@@ -1,6 +1,5 @@
-# Программа сервера для получения приветствия от клиента и отправки ответа
 from contextlib import closing
-from socket import *
+from socket import socket, AF_INET, SOCK_STREAM, SOL_SOCKET, SO_REUSEADDR
 import click
 import json
 import time
@@ -16,7 +15,7 @@ logger = logging.getLogger('messenger.server')
 @click.option('--p', default=7777, help=f'server TCP port (default - 7777)')
 def main(a, p):
     with socket(AF_INET, SOCK_STREAM) as s:  # Создает сокет TCP
-        s.setsockopt(SOL_SOCKET, SO_REUSEADDR, 1)  # Чтобы не занимался порт при вываливании ошибки
+        # s.setsockopt(SOL_SOCKET, SO_REUSEADDR, 1)  # Чтобы не занимался порт при вываливании ошибки
         s.bind((a, p))  # Присваивает порт
         s.listen()
 
@@ -37,7 +36,7 @@ def main(a, p):
                     client.send(json.dumps(response).encode(ENCODING))
                     logger.info('success authorise user %s', data['user']['account_name'])
                 elif 'action' in data and data['action'] == 'quit':
-                    logger.info('user %s disconected', data['user']['account_name'])
+                    logger.info('user %s disconnected', data['user']['account_name'])
                     break
 
 

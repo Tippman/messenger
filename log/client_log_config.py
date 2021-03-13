@@ -61,15 +61,15 @@ logger.setLevel(logging.INFO)
 # Создаём потоковый обработчик логгирования (по умолчанию sys.stderr):
 logger_func_call = logging.getLogger('messenger.function_call_info')
 log_fn_formatter = logging.Formatter("%(asctime)s %(message)s")
-stream_handler = logging.StreamHandler()
-stream_handler.setLevel(logging.DEBUG)
-stream_handler.setFormatter(log_fn_formatter)
-logger_func_call.addHandler(stream_handler)
+f_handler = logging.FileHandler('messenger.func_calls.log', encoding='utf-8')
+f_handler.setLevel(logging.DEBUG)
+f_handler.setFormatter(log_fn_formatter)
+logger_func_call.addHandler(f_handler)
 logger_func_call.setLevel(logging.DEBUG)
 
 
 def log_fn_info(func):
-    """Выводит в поток вывода информацию о вызываемой функции, переданных в нее аргументах,
+    """Выводит в файл информацию о вызываемой функции, переданных в нее аргументах,
     а также имя функции, инициирующей вызов текущей"""
 
     @wraps(func)
@@ -77,7 +77,7 @@ def log_fn_info(func):
         insp_stack = inspect.stack()  # получаем стек вызовов вызываемой функции
         func_call_attrs = inspect.getcallargs(func, *args, **kwargs)  # получаем переданные в функцию параметры
         logger_func_call.info(
-            f'Функция {func.__name__} была вызвана с параметрами {func_call_attrs} из функции {insp_stack[1].function}\n')
+            f'Функция {func.__name__} была вызвана с параметрами {func_call_attrs} из функции {insp_stack[1].function}')
         return func(*args, **kwargs)
 
     return call

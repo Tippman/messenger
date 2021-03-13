@@ -1,5 +1,5 @@
 import click
-from socket import *
+from socket import socket, AF_INET, SOCK_STREAM
 
 from messenger.client import Client
 from messenger.client_soket import ClientSoket
@@ -13,8 +13,8 @@ ENCODING = 'utf-8'
 def main(addr, port):
     with socket(AF_INET, SOCK_STREAM) as s:  # Создать сокет TCP
         s.connect((addr, port))  # Соединиться с сервером
-        client_soket = ClientSoket(s)
-        client = Client(client_socket=client_soket, account_name='tippman')
+        client_socket = ClientSoket(s)
+        client = Client(client_socket=client_socket, account_name='tippman')
         client.authenticate(password='qwerty12')
         client.get_response()
 
