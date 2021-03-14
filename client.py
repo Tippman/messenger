@@ -12,7 +12,7 @@ ENCODING = 'utf-8'
 @click.option('--port', default=7777, help='server TCP port (default - 7777)')
 def main(addr, port):
     with socket(AF_INET, SOCK_STREAM) as s:  # Создать сокет TCP
-        s.connect((addr, port))  # Соединиться с сервером
+        s.connect(('127.0.0.1', 7777))  # Соединиться с сервером
         client_socket = ClientSoket(s)
         client = Client(client_socket=client_socket, account_name='tippman')
         client.authenticate(password='qwerty12')
