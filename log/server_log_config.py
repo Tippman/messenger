@@ -40,7 +40,6 @@ fh = logging.FileHandler("messenger.server.log", encoding='utf-8')
 fh.setLevel(logging.INFO)
 fh.setFormatter(formatter)
 
-
 # Добавляем в логгер новый обработчик событий и устанавливаем уровень логгирования
 logger.addHandler(fh)
 logger.setLevel(logging.INFO)
@@ -55,14 +54,3 @@ logger.setLevel(logging.INFO)
 # | INFO             | log.info(fmt [, *args [, exc_info [, extra]]])
 # | DEBUG            | log.debug(fmt [, *args [, exc_info [, extra]]])
 # -----------------------------------------------------------------------------
-
-
-
-if __name__ == '__main__':
-    # Создаём потоковый обработчик логгирования (по умолчанию sys.stderr):
-    console = logging.StreamHandler()
-    console.setLevel(logging.DEBUG)
-    console.setFormatter(formatter)
-    logger.addHandler(console)
-    # В логгирование передаем имя текущей функции и имя вызвавшей функции
-    logger.info('Тестовый запуск логгирования')
