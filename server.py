@@ -1,111 +1,167 @@
-from contextlib import closing
-from socket import socket, AF_INET, SOCK_STREAM, SOL_SOCKET, SO_REUSEADDR
-import click
+""" серверная часть """
 import json
-import time
 import logging
-from select import select
-import log.server_log_config
+import select
+import time
+import sys
+import logs.config_server_log
+from lib.variables import *
+from lib.utils import server_settings, create_socket, get_message, send_message
+from logs.decoration_log import log
 
-ENCODING = 'utf-8'
-logger = logging.getLogger('messenger.server')
-
-
-def disconnect_client(sock, all_clients):
-    # print(f"Клиент {sock.fileno()} {sock.getpeername()} отключился")
-    sock.close()
-    all_clients.remove(sock)
+SERVER_LOGGER = logging.getLogger('server')
 
 
-def read_requests(r_clients, all_clients):
-    responses = {}  # Словарь ответов сервера вида {сокет: запрос}
+@log
+def client_message_handler(message, messages_list, client, clients, names):
+    '''
+    Обработчик сообщений от клиентов, принимает словарь - сообщение от клинта,
+    проверяет корректность, отправляет словарь-ответ для клиента с результатом приёма.
+    :param message:
+    :param messages_list:
+    :param client:
+    :return:
+    '''
+    SERVER_LOGGER.debug(f'функция разбора message от клиента: {message}')
+    if ACTION not in message:
+        SERVER_LOGGER.error(f"сообщение от клиента не содержит обязательного поля ACTION: {message}")
+        print(f"сообщение от клиента не содержит обязательного поля ACTION: {message}")
+        send_message(client, {RESPONSE: 400, ERROR: ERR400})
+        return
+    elif TIME not in message:
+        SERVER_LOGGER.error(f"сообщение от клиента не содержит обязательного поля TIME: {message}")
+        print(f"сообщение от клиента не содержит обязательного поля TIME: {message}")
+        send_message(client, {RESPONSE: 400, ERROR: ERR400})
+        return
+    elif ACTION in message and message[ACTION] == PRESENCE and TIME in message and message[USER][
+        ACCOUNT_NAME] == 'Guest':
+        SERVER_LOGGER.debug(f"сформировано PRESENCE сообщение:{message}")
+        send_message(client, {RESPONSE: 200, ERROR: ERR200, MSG: str(f"Welcome, {message[USER][ACCOUNT_NAME]}")})
+        return
+    elif ACTION in message and message[ACTION] == AUTH and TIME in message and USER in message \
+            and message[USER][ACCOUNT_NAME] != 'Guest':
+        if str(message[USER][ACCOUNT_NAME]).lower() not in str(names.keys()).lower():  # нет такого, можно регать
+            SERVER_LOGGER.debug(f"сформировано AUTH сообщение: {message}. Пользователь занесен в список")
+            names[message[USER][ACCOUNT_NAME]] = client
+            send_message(client, {RESPONSE: 200, ERROR: ERR200, MSG: str(f"Welcome, {message[USER][ACCOUNT_NAME]}")})
+            return
+        else:
+            response = RESPONSE_400
+            response[ERROR] = 'Имя пользователя уже занято.'
+            send_message(client, response)
+            clients.remove(client)
+            client.close()
+        return
+    elif ACTION in message and message[ACTION] == MSG and DESTINATION in message and TIME in message \
+            and SENDER in message and MSG_TEXT in message:
+        SERVER_LOGGER.debug(f"сформировано MSG сообщение: {message}")
+        messages_list.append((message))
+        return
+    elif ACTION in message and message[ACTION] == WHO and TIME in message:
+        SERVER_LOGGER.debug(f"сформировано WHO сообщение: {message}")
+        message[DESTINATION] = message[SENDER]  # отправить список самому себе
+        all_names = ''
+        for el in names:
+            all_names += all_names + ' | ' + el
+        all_names = f"пользователи в сети:\n{all_names[3:]}"
+        message[MSG_TEXT] = all_names
+        messages_list.append((message))
+    elif ACTION in message and message[ACTION] == EXIT and ACCOUNT_NAME in message:
+        SERVER_LOGGER.info(f"пользователь {message[ACCOUNT_NAME]} вышел")
+        print(f"пользователь {message[ACCOUNT_NAME]} вышел")
+        clients.remove(names[message[ACCOUNT_NAME]])
+        names[message[ACCOUNT_NAME]].close()
+        del names[message[ACCOUNT_NAME]]
+        return
+    else:
+        SERVER_LOGGER.error(f"функция разбора message от клиента, ни одно из условий не подошло: {message}")
+        print(f"функция разбора message от клиента, ни одно из условий не подошло: {message}")
+        response = RESPONSE_400
+        response[ERROR] = 'Запрос некорректен.'
+        send_message(client, response)
+        return
 
-    for sock in r_clients:
+
+@log
+def process_message(message, names, listen_socks):
+    """
+    Функция адресной отправки сообщения определённому клиенту. Принимает словарь сообщение,
+    список зарегистрированых пользователей и слушающие сокеты. Ничего не возвращает.
+    :param message:
+    :param names:
+    :param listen_socks:
+    :return:
+    """
+    if message[DESTINATION] in names and names[message[DESTINATION]] in listen_socks:
+        send_message(names[message[DESTINATION]], message)
+        SERVER_LOGGER.info(f'Отправлено сообщение пользователю {message[DESTINATION]} '
+                           f'от пользователя {message[SENDER]}.')
+    elif message[DESTINATION] in names and names[message[DESTINATION]] not in listen_socks:
+        raise ConnectionError
+    else:
+        SERVER_LOGGER.error(
+            f'Пользователь {message[DESTINATION]} не зарегистрирован на сервере, '
+            f'отправка сообщения невозможна.')
+
+
+@log
+def start_server():
+    srv_settings = server_settings()
+    server_address = srv_settings[0]
+    server_port = srv_settings[1]
+
+    transport = create_socket()
+    transport.bind((server_address, server_port))
+    transport.settimeout(SERVER_TIMEOUT)
+    transport.listen(MAX_CONNECTIONS)
+
+    print(f"server start on: {server_address}:{server_port}")
+    SERVER_LOGGER.info(f"server started on {server_address}:{server_port}")
+
+    clients = []  # список клиентов
+    messages = []  # список сообщений
+
+    names = dict()  # словарь зарегистрированных пользователей
+
+    while True:
         try:
-            data = sock.recv(1024).decode(ENCODING)
-            responses[sock] = data
-            print(responses[sock])
-            # logger.info('server get message, action - %s', responses[sock]['action'])
-        except Exception as e:
-            logger.error('%s', e)
-            disconnect_client(sock, all_clients)
-            raise
+            client, client_address = transport.accept()
+            SERVER_LOGGER.debug(f'client | {client_address}')
+        except OSError:
+            pass
+        else:
+            print(f"Получен запрос на соединение от {str(client_address)}")
+            SERVER_LOGGER.info(f"установлено соедниение с клиентом {client_address}")
+            clients.append(client)
 
-    return responses
+        recv_data_lst = []
+        send_data_lst = []
+        err_lst = []
 
+        try:
+            if clients:
+                recv_data_lst, send_data_lst, err_lst = select.select(clients, clients, [], 0)
+        except OSError:
+            pass
 
-def write_responses(requests, w_clients, all_clients):
-    for sock in w_clients:
-        for recv_sock, data in requests.items():
-            if sock is recv_sock:
-                continue
-
-            try:
-                resp = data.encode(ENCODING)
-                sock.send(resp)
-            except:  # Сокет недоступен, клиент отключился
-                disconnect_client(sock, all_clients)
-
-
-@click.command()
-@click.option('--a', help='server IP address')
-@click.option('--p', default=7777, help=f'server TCP port (default - 7777)')
-def main(a, p):
-    clients = []
-
-    s = socket(AF_INET, SOCK_STREAM)
-    s.setsockopt(SOL_SOCKET, SO_REUSEADDR, 1)
-
-    try:
-        s.bind((a, p))
-        s.listen()
-        s.settimeout(0.2)  # Таймаут для операций с сокетом
-        while True:
-            try:
-                conn, addr = s.accept()  # Проверка подключений
-            except OSError:
-                pass  # timeout вышел
-            else:
-                logger.info("Получен запрос на соединение от %s", addr)
-                # print(f"Получен запрос на соединение от {addr}")
-                clients.append(conn)
-            finally:
-                # Проверить наличие событий ввода-вывода
-                wait = 0
-                r = []
-                w = []
+        if recv_data_lst:
+            for client_with_message in recv_data_lst:
                 try:
-                    r, w, e = select(clients, clients, [], wait)
-                except:
-                    pass  # Ничего не делать, если какой-то клиент отключился
-
-                requests = read_requests(r, clients)  # Сохраним запросы клиентов
-                write_responses(
-                    requests, w, clients
-                )  # Выполним отправку ответов клиентам
-    finally:
-        for sock in clients:
-            sock.close()
-        s.close()
-
-        # with closing(client):
-        #     request = client.recv(10000)
-        #     request_str = request.decode(ENCODING)
-        #     data = json.loads(request_str)
-        #     logger.info('server get message, action - %s', data['action'])
-        #
-        #     if 'action' in data and data['action'] == 'authenticate':
-        #         response = {
-        #             'response': 200,
-        #             'time': time.time(),
-        #             'alert': 'Success connection established!'
-        #         }
-        #         client.send(json.dumps(response).encode(ENCODING))
-        #         logger.info('success authorise user %s', data['user']['account_name'])
-        #     elif 'action' in data and data['action'] == 'quit':
-        #         logger.info('user %s disconnected', data['user']['account_name'])
-        #         break
+                    client_message_handler(get_message(client_with_message), messages, client_with_message, clients,
+                                           names)
+                except Exception:
+                    SERVER_LOGGER.info(f"клиент {client_with_message.getpeername()} отключился")
+                    print(f"клиент {client_with_message.getpeername()} отключился")
+                    clients.remove(client_with_message)
+        for i in messages:
+            try:
+                process_message(i, names, send_data_lst)
+            except Exception:
+                SERVER_LOGGER.info(f'Связь с клиентом  {i[DESTINATION]} потеряна')
+                clients.remove(names[i[DESTINATION]])
+                del names[i[DESTINATION]]
+            messages.clear()
 
 
 if __name__ == '__main__':
-    main()
+    start_server()
