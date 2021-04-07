@@ -4,18 +4,19 @@ from datetime import datetime
 
 # сообщения отправляемые клиентом
 # “action”: “presence” — присутствие. Сервисное сообщение для извещения сервера о присутствии клиента online;
-# “action”: “prоbe” — проверка присутствия. Сервисное сообщение от сервера для проверки присутствии клиента online;
-# “action”: “msg” — простое сообщение пользователю или в чат;
+# “action”: “on_chat” — простое сообщение в чат;
+# “action”: “on_group” — простое сообщение в чат;
 # “action”: “quit” — отключение от сервера;
 # “action”: “authenticate” — авторизация на сервере;
-# “action”: “join” — присоединиться к чату;
-# “action”: “leave” — покинуть чат.
+# “action”: “create_group” — создать новый чат ;
+# “action”: “invite_in_group” — пригласить пользователей в чат ;
+# “action”: “join_group” — присоединиться к чату;
+# “action”: “leave_group” — покинуть чат.
 @dataclass()
 class BaseClientMessage:
     action: str
-    time: datetime
+    time: str
     author: str
-    msg_size: int
 
 
 @dataclass()
@@ -36,10 +37,11 @@ class AuthenticateMessage(BaseClientMessage):
 
 
 # ответы/запросы сервера
+# “action”: “prоbe” — проверка присутствия. Сервисное сообщение от сервера для проверки присутствии клиента online;
 @dataclass()
 class BaseServerMessage:
     response: int
-    time: datetime
+    time: str
 
 
 @dataclass()

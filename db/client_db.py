@@ -34,7 +34,7 @@ class ClientStorage:
         return result.scalars().first()
 
     def add_client(self, login, password) -> None:
-        """ добавляет клиента в БД или выбрасывет исключение если такой клиент уже есть"""
+        """ добавляет клиента в БД или выбрасывет исключение если такой клиент уже есть """
         try:
             with self._session.begin():
                 self._session.add(Client(login=login, password=password))
