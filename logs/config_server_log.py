@@ -8,6 +8,7 @@ from pathlib import Path
 from icecream import ic
 
 BASE_DIR = Path(__file__).resolve().parent.parent
+
 LOGGER_FILENAMES = {
     'SERVER_LOG_FILENAME': 'server_log.log',
     'CLIENT_LOG_FILENAME': 'client_log.log',
@@ -24,14 +25,14 @@ LOGGING = {
     'handlers': {
         'server_log': {
             'class': 'logging.FileHandler',
-            'level': 'INFO',
+            'level': 'DEBUG',
             'filename': f'{BASE_DIR}/logs/log_files/{LOGGER_FILENAMES["SERVER_LOG_FILENAME"]}',
             'encoding': 'utf-8',
             'formatter': 'basic',
         },
         'client_log': {
             'class': 'logging.FileHandler',
-            'level': 'INFO',
+            'level': 'DEBUG',
             'filename': f'{BASE_DIR}/logs/log_files/{LOGGER_FILENAMES["CLIENT_LOG_FILENAME"]}',
             'encoding': 'utf-8',
             'formatter': 'basic',

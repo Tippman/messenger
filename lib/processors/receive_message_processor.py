@@ -11,6 +11,7 @@ from lib.processors.disconnector import Disconnector
 
 
 class Deserializer:
+    """ Десериалайзер входящих заголовков и сообщений """
     def __init__(self,
                  loads=json.loads,
                  encoding=ENCODING_FORMAT,
@@ -28,40 +29,22 @@ class Deserializer:
         try:
             msg_string = msg_data.decode(self._encoding)
             msg_dict = self._loads(msg_string)
-            return self._msg_factory.on_msg(msg_dict=msg_dict, ip_addr=ip_addr, port=port)
+            self._msg_factory.on_msg(msg_dict=msg_dict, ip_addr=ip_addr, port=port)
         except Exception as e:
-            return self._disconnector.disconnect(ip_addr, port, e)
+            self._disconnector.disconnect(ip_addr, port, e)
 
 
 class MessageSplitter:
+    """ Класс начальной обработки входящих данных """
     def __init__(self,
                  pack_format=PACK_FORMAT,
                  deserializer=Deserializer()):
         self.pack_format = pack_format
         self.deserializer = deserializer
+        self._logger = logging.getLogger('server_log')
 
     def feed(self, data):
         """ разбивает входящие данные на размер сообщения, ip слиента, port клиента и само сообщение """
         msg_len, ip_pack, port, data_body = struct.unpack(self.pack_format, data)
         data_body = data_body[:msg_len]
-        return self.deserializer.on_msg(ip_pack=ip_pack, port=port, msg_data=data_body)
-
-
-
-# strr = 'aвыпа fds1234'
-# msg_d = {
-#     "action": "on chat",
-#     "time": str(datetime.datetime.now()),
-#     "to": "account_name",
-#     "author": "account_name",
-#     "message": strr
-# }
-#
-# msg = json.dumps(msg_d)
-#
-# msg_bytes = msg.encode(ENCODING_FORMAT)
-#
-# package = struct.pack(PACK_FORMAT, len(msg_bytes), msg_bytes)
-#
-# ms = MessageSplitter()
-# ms.feed(package)
+        self.deserializer.on_msg(ip_pack=ip_pack, port=port, msg_data=data_body)

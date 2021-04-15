@@ -20,18 +20,35 @@ class BaseClientMessage:
 
 
 @dataclass()
-class OnChatMessage(BaseClientMessage):
+class AddOrRemoveContactMessage:
+    action: str
+    time: str
+    author: str
+    target_login: str
+
+
+@dataclass()
+class OnChatMessage:
+    action: str
+    time: str
+    author: str
     message: str
 
 
 @dataclass()
-class P2PMessage(BaseClientMessage):
+class P2PMessage:
+    action: str
+    time: str
+    author: str
     to: str
     message: str
 
 
 @dataclass()
-class AuthenticateMessage(BaseClientMessage):
+class AuthenticateMessage:
+    action: str
+    time: str
+    author: str
     account_name: str
     password: str
 

@@ -10,6 +10,11 @@ class ClientMessageFactory:
         """ отправляет в соответствии с action сообщения на сборку """
         if action == 'on_chat':
             return self.create_on_chat_msg(msg_body)
+        if action == 'add_contact' or action == 'del_contact':
+            author_login, target_login = msg_body.split()
+            return self.create_response_add_or_remove_client_contact(action=action,
+                                                                     author_login=author_login,
+                                                                     target_login=target_login)
 
     def feed(self, msg: str):
         """ принимает сообщение от пользователя и разбивает его на команду и тело команды.
@@ -36,11 +41,21 @@ class ClientMessageFactory:
         }
         return data
 
+    def create_response_add_or_remove_client_contact(self, action, author_login, target_login):
+        """ возвращает словарь с запросом на добавление или удаление контактов пользователя """
+        return {'action': action,
+                'time': str(datetime.datetime.now()),
+                'user_login': author_login,
+                'target_login': target_login}
+
+    def create_response_get_client_contacts(self, account_name):
+        """ возвращает словарь с запросом списка контактов пользователя """
+        return {'action': 'get_contacts',
+                'time': str(datetime.datetime.now()),
+                'user_login': account_name}
+
     def create_on_chat_msg(self, msg_body):
         """ возвращает сообщение-словарь on_chat """
-        data = {
-            'action': 'on_chat',
-            'time': str(datetime.datetime.now()),
-            'message': msg_body,
-        }
-        return data
+        return {'action': 'on_chat',
+                'time': str(datetime.datetime.now()),
+                'message': msg_body}
