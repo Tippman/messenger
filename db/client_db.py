@@ -36,6 +36,10 @@ class ClientStorage:
     def __init__(self, session):
         self._session = session
 
+    def get_all_clients(self):
+        """ получить список всех пользователей """
+        return self._session.query(Client).all()
+
     def get_client_contacts(self, login) -> list:
         """ возвращает список контактов (логинов) пользователя """
         client = self.get_client(login)
@@ -90,8 +94,9 @@ class ClientHistoryStorage:
     def __init__(self, session):
         self._session = session
 
+    def gef_all_records(self):
+        return self._session.query(ClientHistory).all()
+
     def add_record(self, client_id, ip_address,
                    time=datetime.now(), info=None):
         self._session.add(ClientHistory(client_id=client_id, ip_address=ip_address, time=time, info=info))
-
-

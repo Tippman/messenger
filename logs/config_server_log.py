@@ -12,6 +12,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 LOGGER_FILENAMES = {
     'SERVER_LOG_FILENAME': 'server_log.log',
     'CLIENT_LOG_FILENAME': 'client_log.log',
+    'SERVER_ADMIN_APP_LOG': 'server_admin_app_log.log',
 }
 
 LOGGING = {
@@ -37,6 +38,13 @@ LOGGING = {
             'encoding': 'utf-8',
             'formatter': 'basic',
         },
+        'server_admin_app_log': {
+            'class': 'logging.FileHandler',
+            'level': 'DEBUG',
+            'filename': f'{BASE_DIR}/logs/log_files/{LOGGER_FILENAMES["SERVER_ADMIN_APP_LOG"]}',
+            'encoding': 'utf-8',
+            'formatter': 'basic',
+        },
     },
     'loggers': {
         'server_log': {
@@ -47,6 +55,11 @@ LOGGING = {
             'handlers': ['client_log'],
             'level': 'DEBUG',
         },
+        'server_admin_app_log': {
+            'handlers': ['server_admin_app_log'],
+            'level': 'DEBUG',
+        },
+
     }
 }
 

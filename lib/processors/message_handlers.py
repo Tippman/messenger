@@ -86,8 +86,12 @@ class ServerMessageHandler:
 
             if datacls.action == 'add_contact':
                 current_client.contacts.append(target_client)
+                self._logger.info('Success added a client "%s" to "%s" contact list!',
+                                  datacls.target_login, datacls.author)
             elif datacls.action == 'del_contact':
                 current_client.contacts.remove(target_client)
+                self._logger.info('Success removed a client "%s" to "%s" contact list!',
+                                  datacls.target_login, datacls.author)
             self._session.commit()
 
             response_dataclass = SuccessServerMessage(response=201,
@@ -95,8 +99,6 @@ class ServerMessageHandler:
                                                       alert=f'<{ip_addr}:{port} {datacls.author}>: '
                                                             f'Success add a client "{datacls.target_login}" '
                                                             f'to contact list!')
-            self._logger.info('Success added a client "%s" to "%s" contact list!',
-                              datacls.target_login, datacls.author)
 
         else:
             # ни один из переданных логинов не найден в базе:

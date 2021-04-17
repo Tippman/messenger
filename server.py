@@ -29,7 +29,7 @@ class Server:
             client.send(message)
 
     def disconnect_socket(self, sock):
-        """ отключает сокет"""
+        """ отключает сокет """
         # TODO как получить адрес клиента если он отключился?
         self.logger.info('Client disconnected')
         index = self.clients.index(sock)
@@ -91,6 +91,8 @@ class Server:
         """ основной поток обработки входящих соединений """
         print('Server is listening...')
 
+        self.init_gui()
+
         self.server.bind(self.SERVER_ADDR)
         self.server.listen(MAX_CONNECTIONS)
         self.server.settimeout(0.2)
@@ -121,7 +123,15 @@ class Server:
                 if responses:
                     self.clients_write(responses, w_sockets)
 
+    def init_gui(self):
+        # TODO при импорте флокируется основной поток server.py. пока файл не импортируем
+        import server_gui
+        pass
+
 
 if __name__ == "__main__":
     server = Server(SERVER_ADDR)
     server.run()
+
+    app_thread = threading.Thread(target=server.init_gui)
+    app_thread.start()
