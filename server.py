@@ -1,6 +1,8 @@
 ﻿""" Серверная часть """
 import json
 import sys
+
+from PyQt5.QtWidgets import QApplication
 from icecream import ic
 from select import select
 import socket
@@ -10,6 +12,7 @@ import logs.config_server_log
 from lib.processors.message_sender import SendBuffer, Serializer, MessageSender
 from lib.variables import *
 from lib.processors.receive_message_processor import MessageSplitter
+from server_gui import MainWindow
 
 
 class Server:
@@ -91,8 +94,6 @@ class Server:
         """ основной поток обработки входящих соединений """
         print('Server is listening...')
 
-        self.init_gui()
-
         self.server.bind(self.SERVER_ADDR)
         self.server.listen(MAX_CONNECTIONS)
         self.server.settimeout(0.2)
@@ -123,15 +124,13 @@ class Server:
                 if responses:
                     self.clients_write(responses, w_sockets)
 
-    def init_gui(self):
-        # TODO при импорте флокируется основной поток server.py. пока файл не импортируем
-        import server_gui
-        pass
-
 
 if __name__ == "__main__":
     server = Server(SERVER_ADDR)
-    server.run()
+    serv_thr = threading.Thread(target=server.run)
+    serv_thr.start()
 
-    app_thread = threading.Thread(target=server.init_gui)
-    app_thread.start()
+    app = QApplication(sys.argv)
+    mw = MainWindow()
+    mw.show()
+    sys.exit(app.exec_())

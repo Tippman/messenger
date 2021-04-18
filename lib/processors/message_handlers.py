@@ -38,8 +38,7 @@ class ServerMessageHandler:
             Результат выборки уходит в Message Sender """
         if self._client_storage.is_client_exist(datacls.author):
             client_contacts_list = self._client_storage.get_client_contacts(datacls.author)
-            self._client_history_storage.add_record(self._client_storage.get_client(datacls.author).id,
-                                                    ip_address=':'.join((str(ip_addr), str(port))))
+
             response_dataclass = SuccessServerMessage(response=202,
                                                       time=str(datetime.now()),
                                                       alert=json.dumps(client_contacts_list))
@@ -56,7 +55,8 @@ class ServerMessageHandler:
             self._logger.info('Success authorize client %s:%s', str(ip_addr), str(port))
             user = self._client_storage.get_client(datacls.account_name)
             self._client_history_storage.add_record(user.id, ip_address=':'.join((str(ip_addr), str(port))),
-                                                    info=f'Success authorization user: {datacls.account_name}')
+                                                    info=f'Success authorization user: {datacls.account_name}',
+                                                    time=datetime.now())
             response_dataclass = SuccessServerMessage(response=200,
                                                       time=str(datetime.now()),
                                                       alert=f'<{ip_addr}:{port} {datacls.account_name}>: Success authorize client!')
@@ -81,24 +81,42 @@ class ServerMessageHandler:
     def add_or_remove_contact_to_client(self, datacls, ip_addr, port):
         """ довавляет или удаляет контакт из clients_contacts """
         if self._client_storage.is_client_exist(datacls.target_login):
-            current_client = self._session.query(Client).filter(Client.login == datacls.author).one()
-            target_client = self._session.query(Client).filter(Client.login == datacls.target_login).one()
+            current_client = self._client_storage.get_client(datacls.author)
+            target_client = self._client_storage.get_client(datacls.target_login)
 
-            if datacls.action == 'add_contact':
-                current_client.contacts.append(target_client)
-                self._logger.info('Success added a client "%s" to "%s" contact list!',
-                                  datacls.target_login, datacls.author)
-            elif datacls.action == 'del_contact':
-                current_client.contacts.remove(target_client)
-                self._logger.info('Success removed a client "%s" to "%s" contact list!',
-                                  datacls.target_login, datacls.author)
+            if target_client not in current_client.contacts.all():
+                # если target login нет в списке контактов - добавляем
+                if datacls.action == 'add_contact':
+                    current_client.contacts.append(target_client)
+                    self._logger.info('Success added a client "%s" to "%s" contact list!',
+                                      datacls.target_login, datacls.author)
+
+                    self._client_history_storage.add_record(current_client.id,
+                                                            ip_address=':'.join((str(ip_addr), str(port))),
+                                                            info=f'Success adding a contact "{datacls.target_login}" '
+                                                                 f'to user: {datacls.author}',
+                                                            time=datetime.now())
+            else:
+                # если target login есть в списке контактов - удаляем
+                if datacls.action == 'del_contact':
+                    self._logger.info('Adding a client "%s" to "%s" contact list failed! Contact already exists.',
+                                      datacls.target_login, datacls.author)
+                    current_client.contacts.remove(target_client)
+                    self._logger.info('Success removed a client "%s" to "%s" contact list!',
+                                      datacls.target_login, datacls.author)
+                    self._client_history_storage.add_record(current_client.id,
+                                                            ip_address=':'.join((str(ip_addr), str(port))),
+                                                            info=f'Success removed a contact "{datacls.target_login}" '
+                                                                 f'to user: {datacls.author}',
+                                                            time=datetime.now())
+
             self._session.commit()
 
             response_dataclass = SuccessServerMessage(response=201,
                                                       time=str(datetime.now()),
                                                       alert=f'<{ip_addr}:{port} {datacls.author}>: '
-                                                            f'Success add a client "{datacls.target_login}" '
-                                                            f'to contact list!')
+                                                            f'Success add/remove a client "{datacls.target_login}" '
+                                                            f'to/from contact list of user: {datacls.author}!')
 
         else:
             # ни один из переданных логинов не найден в базе:

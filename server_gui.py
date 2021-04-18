@@ -53,12 +53,13 @@ class MainWindow(QMainWindow):
         """ рендер таблицы с пользователями. отображает 2 колонки - id and login """
         self._logger.debug('Drawing clients table')
         clients = self._client_storage.get_all_clients()
-        self.clientListTableWidget.setRowCount(len(clients))
-        for row_num, client in enumerate(clients):
-            id_item = QTableWidgetItem(str(client.id))
-            login_item = QTableWidgetItem(client.login)
-            self.clientListTableWidget.setItem(row_num, 0, id_item)  # id col
-            self.clientListTableWidget.setItem(row_num, 1, login_item)  # login col
+        if clients:
+            self.clientListTableWidget.setRowCount(len(clients))
+            for row_num, client in enumerate(clients):
+                id_item = QTableWidgetItem(str(client.id))
+                login_item = QTableWidgetItem(client.login)
+                self.clientListTableWidget.setItem(row_num, 0, id_item)  # id col
+                self.clientListTableWidget.setItem(row_num, 1, login_item)  # login col
 
     def draw_clients_history_table(self):
         """ рендер таблицы с историей пользователей.
@@ -66,20 +67,20 @@ class MainWindow(QMainWindow):
         self._logger.debug('Drawing clients history table')
 
         client_histories = self._client_history_storage.gef_all_records()
-        headers = [key for key in client_histories[0].__dict__.keys() if
-                   client_histories and key != '_sa_instance_state']
-        self.clientHistoryTableWidget.setRowCount(len(client_histories))
-        self.clientHistoryTableWidget.setColumnCount(len(headers))
-        self.clientHistoryTableWidget.setHorizontalHeaderLabels(headers)
+        if client_histories:
+            headers = [key for key in client_histories[0].__dict__.keys()
+                       if key != '_sa_instance_state']
+            self.clientHistoryTableWidget.setRowCount(len(client_histories))
+            self.clientHistoryTableWidget.setColumnCount(len(headers))
+            self.clientHistoryTableWidget.setHorizontalHeaderLabels(headers)
 
-        for row_num, client_history in enumerate(client_histories):
-            for col_num, key in enumerate(headers):
-                item = QTableWidgetItem(str(client_history.__dict__[key]))
-                self.clientHistoryTableWidget.setItem(row_num, col_num, item)
+            for row_num, client_history in enumerate(client_histories):
+                for col_num, key in enumerate(headers):
+                    item = QTableWidgetItem(str(client_history.__dict__[key]))
+                    self.clientHistoryTableWidget.setItem(row_num, col_num, item)
 
-
-app = QApplication(sys.argv)
-
-mw = MainWindow()
-mw.show()
-sys.exit(app.exec_())
+# app = QApplication(sys.argv)
+#
+# mw = MainWindow()
+# mw.show()
+# sys.exit(app.exec_())

@@ -33,12 +33,15 @@ session = Session()
 # ic(client_history)
 
 with session.begin():
-    all_clients = session.query(Client).all()
-    ic(all_clients[1].__dict__)
+    # all_clients = session.query(Client).all()
+    # ic(all_clients[1].__dict__)
 
-    # client = session.query(Client).filter(Client.login=="login").one()
-    # ic(type(client.contacts.all()))
-    # ic([c.login for c in client.contacts.all()])
+    client = session.query(Client).filter(Client.login=="tippman").one()
+    ic(type(client.contacts.all()))
+    ic([c.login for c in client.contacts.all()])
+    target = ClientStorage(session).get_client('friend2')
+    ic(target in client.contacts.all())
+
 
     # target = session.query(Client).filter(Client.login=="friend2").one()
     # client.contacts.remove(target)
