@@ -3,7 +3,7 @@ from pathlib import Path
 from icecream import ic
 
 from PyQt5 import uic
-from PyQt5.QtWidgets import QMainWindow, qApp, QApplication, QTableWidget, QTableWidgetItem
+from PyQt5.QtWidgets import QMainWindow, QTableWidgetItem
 from sqlalchemy.orm import sessionmaker
 
 from lib.variables import ENGINE
@@ -15,15 +15,15 @@ from db.client_db import ClientStorage, ClientHistoryStorage
 
 
 class MainWindow(QMainWindow):
-    """ главное окно программы """
+    """ главное окно программы сервера """
 
     def __init__(self):
         super().__init__()
-        ui_file_path = Path(__file__).parent.absolute() / "ui/server.ui"
+        ui_file_path = Path(__file__).parent.parent.absolute() / "ui/server.ui"
         uic.loadUi(ui_file_path, self)
 
         self._logger = logging.getLogger('server_admin_app_log')
-        self._logger.debug('Application start')
+        self._logger.debug('Server application start')
 
         # управление БД и создание сессии
         self._Session = sessionmaker(bind=ENGINE)

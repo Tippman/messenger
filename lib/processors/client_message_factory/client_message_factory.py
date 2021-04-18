@@ -13,7 +13,7 @@ class ClientMessageFactory:
 
         if action == 'add_contact' or action == 'del_contact':
             author_login, target_login = msg_body.split()
-            return self.create_response_add_or_remove_client_contact(action=action,
+            return self.create_request_add_or_remove_client_contact(action=action,
                                                                      author_login=author_login,
                                                                      target_login=target_login)
 
@@ -42,14 +42,14 @@ class ClientMessageFactory:
         }
         return data
 
-    def create_response_add_or_remove_client_contact(self, action, author_login, target_login):
+    def create_request_add_or_remove_client_contact(self, action, author_login, target_login):
         """ возвращает словарь с запросом на добавление или удаление контактов пользователя """
         return {'action': action,
                 'time': str(datetime.datetime.now()),
                 'user_login': author_login,
                 'target_login': target_login}
 
-    def create_response_get_client_contacts(self, account_name):
+    def create_request_get_client_contacts(self, account_name):
         """ возвращает словарь с запросом списка контактов пользователя """
         return {'action': 'get_contacts',
                 'time': str(datetime.datetime.now()),

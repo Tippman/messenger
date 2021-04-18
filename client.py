@@ -7,9 +7,13 @@ import threading
 import datetime
 import struct
 import logging
+
+from PyQt5.QtWidgets import QApplication
+
 import logs.config_server_log
 from icecream import ic
 
+from gui.client_login_gui import MainLoginWindow
 from lib.processors.client_message_factory.client_message_factory import ClientMessageFactory
 from lib.processors.receive_message_processor import MessageSplitter
 from lib.processors.message_sender import Serializer
@@ -45,7 +49,7 @@ class Client:
                 elif message == 'GET_CONTACTS'.encode(ENCODING_FORMAT):
                     self.logger.info('%s: Requesting client contact list', str(self.client.getsockname()))
 
-                    request_dict = self.client_msg_factory.create_response_get_client_contacts(self.login)
+                    request_dict = self.client_msg_factory.create_request_get_client_contacts(self.login)
                     request_data = self.serializer.pack_data(request_dict, self.client_ip, self.client_port)
                     self.client.send(request_data)
 
@@ -93,4 +97,9 @@ class Client:
 
 if __name__ == '__main__':
     client = Client(SERVER_ADDR)
-    client.run()
+
+    client_login_app = QApplication(sys.argv)
+    mw = MainLoginWindow()
+    mw.show()
+    client_main_loop = threading.Thread(target=client.run())
+    sys.exit(client_login_app.exec_())

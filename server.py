@@ -1,18 +1,14 @@
 ﻿""" Серверная часть """
-import json
 import sys
 
 from PyQt5.QtWidgets import QApplication
-from icecream import ic
 from select import select
 import socket
 import threading
-import logging
-import logs.config_server_log
-from lib.processors.message_sender import SendBuffer, Serializer, MessageSender
+from lib.processors.message_sender import MessageSender
 from lib.variables import *
 from lib.processors.receive_message_processor import MessageSplitter
-from server_gui import MainWindow
+from gui.server_gui import MainWindow
 
 
 class Server:
@@ -103,8 +99,8 @@ class Server:
                 client, addr = self.server.accept()
                 print(f'Connected with {str(addr)}')
 
-                self.authenticate_client(client_sock=client, addr=addr)
-                self.get_client_contacts(client_sock=client, addr=addr)
+                # self.authenticate_client(client_sock=client, addr=addr)
+                # self.get_client_contacts(client_sock=client, addr=addr)
             except ValueError as e:
                 print(e)
             except OSError as e:

@@ -13,6 +13,7 @@ LOGGER_FILENAMES = {
     'SERVER_LOG_FILENAME': 'server_log.log',
     'CLIENT_LOG_FILENAME': 'client_log.log',
     'SERVER_ADMIN_APP_LOG': 'server_admin_app_log.log',
+    'CLIENT_LOGIN_APP_LOG': 'client_login_app_log',
 }
 
 LOGGING = {
@@ -45,6 +46,13 @@ LOGGING = {
             'encoding': 'utf-8',
             'formatter': 'basic',
         },
+        'client_login_app_log': {
+            'class': 'logging.FileHandler',
+            'level': 'DEBUG',
+            'filename': f'{BASE_DIR}/logs/log_files/{LOGGER_FILENAMES["CLIENT_LOGIN_APP_LOG"]}',
+            'encoding': 'utf-8',
+            'formatter': 'basic',
+        },
     },
     'loggers': {
         'server_log': {
@@ -57,6 +65,10 @@ LOGGING = {
         },
         'server_admin_app_log': {
             'handlers': ['server_admin_app_log'],
+            'level': 'DEBUG',
+        },
+        'client_login_app_log': {
+            'handlers': ['client_login_app_log'],
             'level': 'DEBUG',
         },
 

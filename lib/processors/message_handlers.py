@@ -107,7 +107,7 @@ class ServerMessageHandler:
                     self._client_history_storage.add_record(current_client.id,
                                                             ip_address=':'.join((str(ip_addr), str(port))),
                                                             info=f'Success removed a contact "{datacls.target_login}" '
-                                                                 f'to user: {datacls.author}',
+                                                                 f'from user: {datacls.author}',
                                                             time=datetime.now())
 
             self._session.commit()
