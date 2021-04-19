@@ -1,43 +1,52 @@
 """ Константы используемые в файлах проекта"""
 import logging
+import ipaddress
+from pathlib import Path
 
+from sqlalchemy import create_engine
+
+BASE_DIR = Path(__file__).resolve().parent.parent
+
+# server connection vars
 DEFAULT_PORT = 7777  # порт по умолчанию
 DEFAULT_IP = '127.0.0.1'  # IP адрес по умолчанию
+SERVER_ADDR = (DEFAULT_IP, DEFAULT_PORT)  # адрес по умолчанию
 MAX_CONNECTIONS = 5  # максимальная очередь подключений
-PACKAGE_LENGTH = 1024  # длина сообщения в байтах
-ENCODING = 'utf-8'  # кодировка
-SERVER_TIMEOUT = 1
 
-# Протокол JIM основные ключи:
-ACTION = 'action'
-TIME = 'time'
-USER = 'user'
-ACCOUNT_NAME = 'account_name'
-SENDER = 'from'
-DESTINATION = 'to'
+# encoding vars
+ENCODING_FORMAT = 'utf-8'  # кодировка
 
+# messages vars
+MAX_MSG_SIZE = 1024  # max длина сообщения в байтах
 
-# Прочие ключи, используемые в протоколе
-PRESENCE = 'presence'
-RESPONSE = 'response'
-ERROR = 'error'
-AUTH = 'authenticate'
-ALERT = 'alert'
-MSG = 'msg'
-MSG_TEXT='msg_text'
-LISTEN = 'listen' # ключ для словаря, отправка от клиента запрос на прослушивание
-EXIT = 'exit'
-WHO='who'
+# pack headers vars
+HEADER_MSG_LENGTH_BYTES = 'h'  # длина заголовка сообщения - 2 байта
+HEADER_IP_BYTES = '4s'  # длина заголовка IP адрес клиента - 4 байта
+HEADER_PORT_BYTES = 'i'  # длина заголовка PORT - 4 байта
+PACK_FORMAT = f'>{HEADER_MSG_LENGTH_BYTES}{HEADER_IP_BYTES}{HEADER_PORT_BYTES}{MAX_MSG_SIZE - 10}s'
+SMALL_PACK_FORMAT = f'>{HEADER_MSG_LENGTH_BYTES}{MAX_MSG_SIZE - 2}s'
 
-CLIENT_LISTEN = False  # используется для определения, клиент пишет или слушает
+# database settings
+ENGINE = create_engine(f'sqlite:////{BASE_DIR}/messenger.sqlite3', echo=True)
+ENGINE_PATH = 'sqlite:///../messenger.sqlite3'
 
-ERR200 = '200:OK'
-ERR400 = '400:Bad request'
-
-RESPONSE_200 = {RESPONSE: 200}
-RESPONSE_400 = {RESPONSE: 400,ERROR: None}
-
-# настройка логирования
-LOG_LEVEL = logging.DEBUG
-LOG_FORMATTER = '%(asctime)s %(levelname)s %(filename)s %(message)s'
-
+# ACTIONS
+ACTION_LIST = [
+    # client actions
+    'authenticate',
+    'quit',
+    'on_chat',
+    'on_group',
+    'create_group',
+    'join_group',
+    'leave_group',
+    'p2p',
+    'presence',
+    'get_contacts',
+    'add_contact',
+    'del_contact',
+    # server actions
+    'probe',
+    'on_chat',
+    'on_group',
+]

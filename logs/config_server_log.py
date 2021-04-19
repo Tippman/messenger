@@ -1,38 +1,77 @@
 """ Конфиг серверного логгера"""
 
-import sys
+import logging
+import logging.config
 import os
-from datetime import datetime
-#import logging
-import logging.handlers
-sys.path.append('../')
-from lib.variables import LOG_LEVEL, ENCODING, LOG_FORMATTER
+from pathlib import Path
 
+from icecream import ic
 
-# создаём формировщик логов (formatter):
-#SERVER_FORMATTER = logging.Formatter('%(asctime)s %(levelname)s %(filename)s %(message)s')
-SERVER_FORMATTER = logging.Formatter(LOG_FORMATTER)
+BASE_DIR = Path(__file__).resolve().parent.parent
 
-# Подготовка имени файла для логирования
-PATH = os.path.dirname(os.path.abspath(__file__))
-PATH = os.path.join(PATH, 'server_'+datetime.now().strftime("%Y%m%d_%H%M%S")+'.log')
+LOGGER_FILENAMES = {
+    'SERVER_LOG_FILENAME': 'server_log.log',
+    'CLIENT_LOG_FILENAME': 'client_log.log',
+    'SERVER_ADMIN_APP_LOG': 'server_admin_app_log.log',
+}
 
-# создаём потоки вывода логов
-#STREAM_HANDLER = logging.StreamHandler(sys.stderr)
-#STREAM_HANDLER.setFormatter(SERVER_FORMATTER)
-#STREAM_HANDLER.setLevel(logging.ERROR)
-LOG_FILE = logging.handlers.TimedRotatingFileHandler(PATH, encoding=ENCODING, interval=1, when='midnight')
-LOG_FILE.setFormatter(SERVER_FORMATTER)
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'formatters': {
+        'basic': {
+            'format': '%(asctime)s - %(levelname)s - %(module)s - %(message)s'
+        },
+    },
+    'handlers': {
+        'server_log': {
+            'class': 'logging.FileHandler',
+            'level': 'DEBUG',
+            'filename': f'{BASE_DIR}/logs/log_files/{LOGGER_FILENAMES["SERVER_LOG_FILENAME"]}',
+            'encoding': 'utf-8',
+            'formatter': 'basic',
+        },
+        'client_log': {
+            'class': 'logging.FileHandler',
+            'level': 'DEBUG',
+            'filename': f'{BASE_DIR}/logs/log_files/{LOGGER_FILENAMES["CLIENT_LOG_FILENAME"]}',
+            'encoding': 'utf-8',
+            'formatter': 'basic',
+        },
+        'server_admin_app_log': {
+            'class': 'logging.FileHandler',
+            'level': 'DEBUG',
+            'filename': f'{BASE_DIR}/logs/log_files/{LOGGER_FILENAMES["SERVER_ADMIN_APP_LOG"]}',
+            'encoding': 'utf-8',
+            'formatter': 'basic',
+        },
+    },
+    'loggers': {
+        'server_log': {
+            'handlers': ['server_log'],
+            'level': 'DEBUG',
+        },
+        'client_log': {
+            'handlers': ['client_log'],
+            'level': 'DEBUG',
+        },
+        'server_admin_app_log': {
+            'handlers': ['server_admin_app_log'],
+            'level': 'DEBUG',
+        },
 
-# создаём регистратор и настраиваем его
-LOGGER = logging.getLogger('server')
-#LOGGER.addHandler(STREAM_HANDLER)
-LOGGER.addHandler(LOG_FILE)
-LOGGER.setLevel(LOG_LEVEL)
+    }
+}
 
-# отладка
-if __name__ == '__main__':
-    LOGGER.critical('Критическая ошибка')
-    LOGGER.error('Ошибка')
-    LOGGER.debug('Отладочная информация')
-    LOGGER.info('Информационное сообщение')
+try:
+    logging.config.dictConfig(LOGGING)
+except ValueError:
+    try:
+        os.mkdir(f'{BASE_DIR}/logs/log_files/')
+    except FileExistsError:
+        pass
+
+    for key, filename in LOGGER_FILENAMES.items():
+        with open(f'{BASE_DIR}/logs/log_files/{filename}', 'w', encoding='utf-8'):
+            pass
+    logging.config.dictConfig(LOGGING)

@@ -4,7 +4,6 @@ import sys
 import os
 import unittest
 from lib.variables import *
-from client import get_user, create_presence, create_action, process_handler
 
 # sys.path.append(os.path.join(os.getcwd(), '..'))
 
