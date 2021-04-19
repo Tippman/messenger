@@ -1,5 +1,6 @@
 ﻿""" Клиентская часть """
 import json
+from queue import Queue
 from select import select
 import sys
 import socket
@@ -8,6 +9,7 @@ import datetime
 import struct
 import logging
 
+from PyQt5.QtCore import QThread
 from PyQt5.QtWidgets import QApplication
 
 import logs.config_server_log
@@ -28,11 +30,14 @@ class Client:
         self.client.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         self.msg_splitter = MessageSplitter()
         self.login = 'tippman'
+        # self.login = ''
         self.password = 's1234'
+        # self.password = ''
         self.client_ip = ''
         self.client_port = int
         self.logger = logging.getLogger('client_log')
         self.serializer = serializer
+        self.client_queue = Queue()
 
     def receive(self):
         while True:
@@ -45,6 +50,9 @@ class Client:
                     auth_dict = self.client_msg_factory.create_auth_message(self.login, self.password)
                     auth_data = self.serializer.pack_data(auth_dict, self.client_ip, self.client_port)
                     self.client.send(auth_data)
+
+                    # auth_dict = self.client_queue.get()
+                    # ic(auth_dict)
 
                 elif message == 'GET_CONTACTS'.encode(ENCODING_FORMAT):
                     self.logger.info('%s: Requesting client contact list', str(self.client.getsockname()))
@@ -97,9 +105,12 @@ class Client:
 
 if __name__ == '__main__':
     client = Client(SERVER_ADDR)
+    client.run()
 
-    client_login_app = QApplication(sys.argv)
-    mw = MainLoginWindow()
-    mw.show()
-    client_main_loop = threading.Thread(target=client.run())
-    sys.exit(client_login_app.exec_())
+    # client_main_loop = threading.Thread(target=client.run())
+    # client_main_loop.start()
+
+    # client_login_app = QApplication(sys.argv)
+    # mw = MainLoginWindow(client)
+    # mw.show()
+    # sys.exit(client_login_app.exec_())

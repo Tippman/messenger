@@ -76,12 +76,20 @@ class MessageFactory:
                                                           author=msg_dict['user_login'])
                     self.msg_router.on_msg(datacls=request_dataclass, ip_addr=ip_addr, port=port)
 
-                elif action == 'add_contact' or action == 'del_contact':
+                elif action == 'add_contact':
                     self.logger.debug('factoring "%s" dataclass for %s:%s', action, str(ip_addr), str(port))
-                    request_dataclass = AddOrRemoveContactMessage(action=action,
-                                                                  time=msg_dict['time'],
-                                                                  author=msg_dict['user_login'],
-                                                                  target_login=msg_dict['target_login'])
+                    request_dataclass = AddContactMessage(action=action,
+                                                          time=msg_dict['time'],
+                                                          author=msg_dict['user_login'],
+                                                          target_login=msg_dict['target_login'])
+                    self.msg_router.on_msg(datacls=request_dataclass, ip_addr=ip_addr, port=port)
+
+                elif action == 'del_contact':
+                    self.logger.debug('factoring "%s" dataclass for %s:%s', action, str(ip_addr), str(port))
+                    request_dataclass = RemoveContactMessage(action=action,
+                                                             time=msg_dict['time'],
+                                                             author=msg_dict['user_login'],
+                                                             target_login=msg_dict['target_login'])
                     self.msg_router.on_msg(datacls=request_dataclass, ip_addr=ip_addr, port=port)
 
 

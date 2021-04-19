@@ -54,7 +54,7 @@ class ServerMessageHandler:
             # если найдено совпадение логина и пароля - формируем ответ 200 клиенту и вызываем отправку
             self._logger.info('Success authorize client %s:%s', str(ip_addr), str(port))
             user = self._client_storage.get_client(datacls.account_name)
-            self._client_history_storage.add_record(user.id, ip_address=':'.join((str(ip_addr), str(port))),
+            self._client_history_storage.add_record(user.id, ip_address=f'{str(ip_addr)}:{str(port)}',
                                                     info=f'Success authorization user: {datacls.account_name}',
                                                     time=datetime.now())
             response_dataclass = SuccessServerMessage(response=200,
@@ -78,25 +78,13 @@ class ServerMessageHandler:
     def on_peer(self, datacls):
         pass
 
-    def add_or_remove_contact_to_client(self, datacls, ip_addr, port):
-        """ довавляет или удаляет контакт из clients_contacts """
+    def remove_contact_from_client(self, datacls, ip_addr, port):
+        """ удаляет контакт из clients_contacts """
         if self._client_storage.is_client_exist(datacls.target_login):
             current_client = self._client_storage.get_client(datacls.author)
             target_client = self._client_storage.get_client(datacls.target_login)
 
-            if target_client not in current_client.contacts.all():
-                # если target login нет в списке контактов - добавляем
-                if datacls.action == 'add_contact':
-                    current_client.contacts.append(target_client)
-                    self._logger.info('Success added a client "%s" to "%s" contact list!',
-                                      datacls.target_login, datacls.author)
-
-                    self._client_history_storage.add_record(current_client.id,
-                                                            ip_address=':'.join((str(ip_addr), str(port))),
-                                                            info=f'Success adding a contact "{datacls.target_login}" '
-                                                                 f'to user: {datacls.author}',
-                                                            time=datetime.now())
-            else:
+            if target_client in current_client.contacts.all() and target_client != current_client:
                 # если target login есть в списке контактов - удаляем
                 if datacls.action == 'del_contact':
                     self._logger.info('Adding a client "%s" to "%s" contact list failed! Contact already exists.',
@@ -110,21 +98,66 @@ class ServerMessageHandler:
                                                                  f'from user: {datacls.author}',
                                                             time=datetime.now())
 
-            self._session.commit()
-
-            response_dataclass = SuccessServerMessage(response=201,
-                                                      time=str(datetime.now()),
-                                                      alert=f'<{ip_addr}:{port} {datacls.author}>: '
-                                                            f'Success add/remove a client "{datacls.target_login}" '
-                                                            f'to/from contact list of user: {datacls.author}!')
-
+                    response_dataclass = SuccessServerMessage(response=200,
+                                                              time=str(datetime.now()),
+                                                              alert=f'<{ip_addr}:{port} {datacls.author}>: '
+                                                                    f'Success add/remove a client "{datacls.target_login}" '
+                                                                    f'to/from contact list of user: {datacls.author}!')
+                    self._session.commit()
+                else:
+                    # логин отсутствует в списке контактов или клиент == цель
+                    self._logger.info('Removing a client "%s" to "%s" contact list failed! Contact not exists.',
+                                      datacls.target_login, datacls.author)
+                    response_dataclass = ErrorServerMessage(response=404,
+                                                            time=str(datetime.now()),
+                                                            error=f'Removing contact failed. Wrong current or target login')
         else:
             # ни один из переданных логинов не найден в базе:
             self._logger.error('Adding contact failed. Wrong current or target login')
             response_dataclass = ErrorServerMessage(response=404,
                                                     time=str(datetime.now()),
                                                     error=f'Adding contact failed. Wrong current or target login')
+        # отправляем ответ
+        self._message_sender.send(response_dataclass)
 
+    def add_contact_to_client(self, datacls, ip_addr, port):
+        """ довавляет контакт из clients_contacts """
+        if self._client_storage.is_client_exist(datacls.target_login):
+            current_client = self._client_storage.get_client(datacls.author)
+            target_client = self._client_storage.get_client(datacls.target_login)
+
+            if target_client not in current_client.contacts.all() and target_client != current_client:
+                # если target login нет в списке контактов - добавляем
+                if datacls.action == 'add_contact':
+                    current_client.contacts.append(target_client)
+                    self._logger.info('Success added a client "%s" to "%s" contact list!',
+                                      datacls.target_login, datacls.author)
+
+                    self._client_history_storage.add_record(current_client.id,
+                                                            ip_address=f'{str(ip_addr)}:{str(port)}',
+                                                            info=f'Success adding a contact "{datacls.target_login}" '
+                                                                 f'to user: {datacls.author}',
+                                                            time=datetime.now())
+
+                    response_dataclass = SuccessServerMessage(response=201,
+                                                              time=str(datetime.now()),
+                                                              alert=f'<{ip_addr}:{port} {datacls.author}>: '
+                                                                    f'Success add/remove a client "{datacls.target_login}" '
+                                                                    f'to/from contact list of user: {datacls.author}!')
+                    self._session.commit()
+            else:
+                # если target login есть в списке контактов или автор == цель
+                self._logger.info('Adding a client "%s" to "%s" contact list failed! Contact already exists.',
+                                  datacls.target_login, datacls.author)
+                response_dataclass = ErrorServerMessage(response=404,
+                                                        time=str(datetime.now()),
+                                                        error=f'Adding contact failed. Wrong current or target login')
+        else:
+            # ни один из переданных логинов не найден в базе:
+            self._logger.error('Adding contact failed. Wrong current or target login')
+            response_dataclass = ErrorServerMessage(response=404,
+                                                    time=str(datetime.now()),
+                                                    error=f'Adding contact failed. Wrong current or target login')
         # отправляем ответ
         self._message_sender.send(response_dataclass)
 
@@ -171,9 +204,13 @@ class MessageRouter:
                 elif datacls.action == 'quit':
                     self.server_msg_handler.unregister(datacls)
 
-            elif isinstance(datacls, AddOrRemoveContactMessage):
+            elif isinstance(datacls, AddContactMessage):
                 self._logger.debug('Routing datacls AddOrRemoveContact')
-                self.server_msg_handler.add_or_remove_contact_to_client(datacls, ip_addr, port)
+                self.server_msg_handler.add_contact_to_client(datacls, ip_addr, port)
+
+            elif isinstance(datacls, RemoveContactMessage):
+                self._logger.debug('Routing datacls AddOrRemoveContact')
+                self.server_msg_handler.remove_contact_from_client(datacls, ip_addr, port)
 
             else:
                 self.server_msg_handler.on_unhandled_msg(datacls)

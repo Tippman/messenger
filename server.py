@@ -86,7 +86,7 @@ class Server:
         client_sock.send(self.send_buffer.data[0])
         self.send_buffer.bytes_sent()
 
-    def run(self):
+    def run(self, event):
         """ основной поток обработки входящих соединений """
         print('Server is listening...')
 
@@ -94,19 +94,19 @@ class Server:
         self.server.listen(MAX_CONNECTIONS)
         self.server.settimeout(0.2)
 
-        while True:
+        while not event.is_set():
             try:
                 client, addr = self.server.accept()
                 print(f'Connected with {str(addr)}')
 
-                # self.authenticate_client(client_sock=client, addr=addr)
-                # self.get_client_contacts(client_sock=client, addr=addr)
+                self.authenticate_client(client_sock=client, addr=addr)
+                self.get_client_contacts(client_sock=client, addr=addr)
             except ValueError as e:
                 print(e)
             except OSError as e:
                 pass
             except KeyboardInterrupt:
-                sys.exit()
+                event.set()
             except Exception as e:
                 print(e)
             finally:
@@ -123,10 +123,14 @@ class Server:
 
 if __name__ == "__main__":
     server = Server(SERVER_ADDR)
-    serv_thr = threading.Thread(target=server.run)
+    server_kill = threading.Event()
+    serv_thr = threading.Thread(target=server.run, args=(server_kill,))
     serv_thr.start()
 
     app = QApplication(sys.argv)
     mw = MainWindow()
     mw.show()
-    sys.exit(app.exec_())
+    app.exec_()
+
+    server_kill.set()
+    serv_thr.join()

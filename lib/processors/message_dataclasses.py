@@ -20,7 +20,15 @@ class BaseClientMessage:
 
 
 @dataclass()
-class AddOrRemoveContactMessage:
+class AddContactMessage:
+    action: str
+    time: str
+    author: str
+    target_login: str
+
+
+@dataclass()
+class RemoveContactMessage:
     action: str
     time: str
     author: str
