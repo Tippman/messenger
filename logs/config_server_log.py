@@ -13,7 +13,7 @@ LOGGER_FILENAMES = {
     'SERVER_LOG_FILENAME': 'server_log.log',
     'CLIENT_LOG_FILENAME': 'client_log.log',
     'SERVER_ADMIN_APP_LOG': 'server_admin_app_log.log',
-    'CLIENT_LOGIN_APP_LOG': 'client_login_app_log',
+    'CLIENT_LOGIN_APP_LOG': 'client_login_app_log.log',
 }
 
 LOGGING = {

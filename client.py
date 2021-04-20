@@ -23,36 +23,40 @@ from lib.variables import *
 
 
 class Client:
-    def __init__(self, SERVER_ADDR, client_message_factory=ClientMessageFactory(), serializer=Serializer()):
+    def __init__(self,
+                 SERVER_ADDR=None,
+                 client_message_factory=ClientMessageFactory(),
+                 serializer=Serializer(),
+                 event_handler=None):
         self.SERVER_ADDR = SERVER_ADDR
         self.client_msg_factory = client_message_factory
         self.client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.client.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         self.msg_splitter = MessageSplitter()
-        self.login = 'tippman'
-        # self.login = ''
-        self.password = 's1234'
-        # self.password = ''
+        # self.login = 'tippman'
+        self.login = ''
+        # self.password = 's1234'
+        self.password = ''
         self.client_ip = ''
         self.client_port = int
         self.logger = logging.getLogger('client_log')
         self.serializer = serializer
         self.client_queue = Queue()
+        self.client_thr_killer = threading.Event()
+        self.event_handler = event_handler
 
     def receive(self):
-        while True:
+        while not self.client_thr_killer.is_set():
             try:
                 message = self.client.recv(MAX_MSG_SIZE)
 
                 if message == 'AUTH'.encode(ENCODING_FORMAT):
-                    self.logger.info('%s: Receive auth response from server', str(self.client.getsockname()))
+                    if self.client_queue.get() == 'authenticate':
+                        self.logger.info('%s: Receive auth response from server', str(self.client.getsockname()))
 
-                    auth_dict = self.client_msg_factory.create_auth_message(self.login, self.password)
-                    auth_data = self.serializer.pack_data(auth_dict, self.client_ip, self.client_port)
-                    self.client.send(auth_data)
-
-                    # auth_dict = self.client_queue.get()
-                    # ic(auth_dict)
+                        auth_dict = self.client_msg_factory.create_auth_message(self.login, self.password)
+                        auth_data = self.serializer.pack_data(auth_dict, self.client_ip, self.client_port)
+                        self.client.send(auth_data)
 
                 elif message == 'GET_CONTACTS'.encode(ENCODING_FORMAT):
                     self.logger.info('%s: Requesting client contact list', str(self.client.getsockname()))
@@ -71,7 +75,7 @@ class Client:
                 break
 
     def write(self):
-        while True:
+        while not self.client_thr_killer.is_set():
             try:
                 message = input("")
                 # если сообщение начинается с "решетки" значит это команда
@@ -104,13 +108,13 @@ class Client:
 
 
 if __name__ == '__main__':
-    client = Client(SERVER_ADDR)
-    client.run()
+    # client.run()
 
     # client_main_loop = threading.Thread(target=client.run())
     # client_main_loop.start()
 
-    # client_login_app = QApplication(sys.argv)
-    # mw = MainLoginWindow(client)
-    # mw.show()
-    # sys.exit(client_login_app.exec_())
+    client_login_app = QApplication(sys.argv)
+    client = Client()
+    mw = MainLoginWindow(client)
+    mw.show()
+    client_login_app.exec_()

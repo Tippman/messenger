@@ -44,7 +44,7 @@ class MessageSplitter:
         self._logger = logging.getLogger('server_log')
 
     def feed(self, data):
-        """ разбивает входящие данные на размер сообщения, ip слиента, port клиента и само сообщение """
+        """ разбивает входящие данные на размер сообщения, ip клиента, port клиента и само сообщение """
         msg_len, ip_pack, port, data_body = struct.unpack(self.pack_format, data)
         data_body = data_body[:msg_len]
         self.deserializer.on_msg(ip_pack=ip_pack, port=port, msg_data=data_body)
