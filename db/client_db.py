@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from sqlalchemy import Column, Integer, String, select, DateTime, ForeignKey, Table
+from sqlalchemy import Column, Integer, String, select, DateTime, ForeignKey, Table, Boolean
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import relationship, relation, backref
 
@@ -20,6 +20,7 @@ class Client(Base):
     id = Column(Integer, primary_key=True)
     login = Column(String(20), unique=True)
     password = Column(String(30))
+    is_auth = Column(Boolean, unique=False, default=False)
 
     client_histories = relationship("ClientHistory", back_populates='client')
     contacts = relationship(

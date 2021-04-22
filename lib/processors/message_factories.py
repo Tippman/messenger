@@ -20,7 +20,7 @@ class MessageFactory:
         self._disconnector = disconnector
         self.logger = logging.getLogger('server_log')
 
-    def on_msg(self, msg_dict, ip_addr, port):
+    def on_msg(self, msg_dict, ip_addr, port, ui_notifier=None, server_queue=None):
         """ формирует датаклассы и передает в MessageRouter """
         try:
             action = msg_dict['action']
@@ -55,10 +55,10 @@ class MessageFactory:
                         datacls=P2PMessage(
                             action=action,
                             time=msg_dict['time'],
-                            author=msg_dict['user']['account_name'],
-                            to=msg_dict['to'],
+                            author=msg_dict['author'],
+                            target=msg_dict['target'],
                             message=msg_dict['message']
-                        ), ip_addr=ip_addr, port=port)
+                        ), ip_addr=ip_addr, port=port, server_queue=server_queue)
 
                 elif action == 'quit':
                     self.logger.debug('factoring "%s" dataclass for %s:%s', action, str(ip_addr), str(port))
@@ -113,11 +113,20 @@ class MessageFactory:
             elif server_response == 200:
                 print('Success')
                 print(msg_dict['alert'])
+                response_dataclass = SuccessServerMessage(response=200,
+                                                          time=msg_dict['time'],
+                                                          alert=msg_dict['alert'])
+                self.msg_router.on_msg(datacls=response_dataclass, ip_addr=ip_addr, port=port, ui_notifier=ui_notifier)
             elif server_response == 201:
                 print('Created')
             elif server_response == 202:
                 print('accepted')
                 print(msg_dict['alert'])
+            elif server_response == 402:
+                print(msg_dict['error'])
+                response_dataclass = ErrorServerMessage(response=402, time=msg_dict['time'],
+                                                        error='Wrong login or password')
+                self.msg_router.on_msg(datacls=response_dataclass, ip_addr=ip_addr, port=port, ui_notifier=ui_notifier)
 
         except Exception as e:
             self._disconnector.disconnect(ip_addr, port, e)

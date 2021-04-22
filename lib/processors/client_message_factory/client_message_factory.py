@@ -14,8 +14,8 @@ class ClientMessageFactory:
         if action == 'add_contact' or action == 'del_contact':
             author_login, target_login = msg_body.split()
             return self.create_request_add_or_remove_client_contact(action=action,
-                                                                     author_login=author_login,
-                                                                     target_login=target_login)
+                                                                    author_login=author_login,
+                                                                    target_login=target_login)
 
     def feed(self, msg: str):
         """ принимает сообщение от пользователя и разбивает его на команду и тело команды.
@@ -60,3 +60,11 @@ class ClientMessageFactory:
         return {'action': 'on_chat',
                 'time': str(datetime.datetime.now()),
                 'message': msg_body}
+
+    def create_p2p_msg(self, target, msg, author):
+        """ возвращает сообщение словарь p2p """
+        return {'action': 'p2p',
+                'time': str(datetime.datetime.now()),
+                'author': author,
+                'target': target,
+                'message': msg}

@@ -27,7 +27,7 @@ PACK_FORMAT = f'>{HEADER_MSG_LENGTH_BYTES}{HEADER_IP_BYTES}{HEADER_PORT_BYTES}{M
 SMALL_PACK_FORMAT = f'>{HEADER_MSG_LENGTH_BYTES}{MAX_MSG_SIZE - 2}s'
 
 # database settings
-ENGINE = create_engine(f'sqlite:////{BASE_DIR}/messenger.sqlite3', echo=True)
+ENGINE = create_engine(f'sqlite:////{BASE_DIR}/messenger.sqlite3', echo=False)
 ENGINE_PATH = 'sqlite:///../messenger.sqlite3'
 
 # ACTIONS

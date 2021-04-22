@@ -48,7 +48,7 @@ class P2PMessage:
     action: str
     time: str
     author: str
-    to: str
+    target: str
     message: str
 
 
@@ -78,16 +78,18 @@ class InfoServerMessage(BaseServerMessage):
 
 
 @dataclass()
-class SuccessServerMessage(BaseServerMessage):
+class SuccessServerMessage:
     # успешное завершение
     # 200 — OK
     # 201(created) — объект создан
     # 202(accepted) — подтверждение
-    alert: str
+    response: int
+    time: str
+    alert: str = ''
 
 
 @dataclass()
-class ErrorClientMessage(BaseServerMessage):
+class ErrorClientMessage:
     # ошибка на стороне клиента
     # 400 — неправильный запрос / JSON - объект
     # 401 — не авторизован
@@ -96,6 +98,8 @@ class ErrorClientMessage(BaseServerMessage):
     # 404(not found) — пользователь / чат отсутствует на сервере
     # 409(conflict) — уже имеется подключение с указанным логином
     # 410(gone) — адресат существует, но недоступен(offline)
+    response: int
+    time: str
     error: str
 
 

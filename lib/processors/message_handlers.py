@@ -6,6 +6,7 @@ import logging
 from sqlalchemy import create_engine
 
 import logs.config_server_log
+from gui.gui_event_handlers import UiNotifier
 
 from lib.processors.message_sender import MessageSender
 from sqlalchemy.orm import sessionmaker
@@ -39,7 +40,7 @@ class ServerMessageHandler:
         if self._client_storage.is_client_exist(datacls.author):
             client_contacts_list = self._client_storage.get_client_contacts(datacls.author)
 
-            response_dataclass = SuccessServerMessage(response=202,
+            response_dataclass = SuccessServerMessage(response=200,
                                                       time=str(datetime.now()),
                                                       alert=json.dumps(client_contacts_list))
             self._message_sender.send(response_dataclass)
@@ -49,7 +50,7 @@ class ServerMessageHandler:
 
     def authenticate_client(self, datacls, ip_addr=None, port=None):
         """ проверяет данные авторизации клиента в БД,
-        в случае совпадения инициирует сборку сервера об успешной авторищации """
+        в случае совпадения инициирует сборку сервера об успешной авторизации """
         if self._client_storage.check_auth_data(datacls.account_name, datacls.password):
             # если найдено совпадение логина и пароля - формируем ответ 200 клиенту и вызываем отправку
             self._logger.info('Success authorize client %s:%s', str(ip_addr), str(port))
@@ -60,11 +61,12 @@ class ServerMessageHandler:
             response_dataclass = SuccessServerMessage(response=200,
                                                       time=str(datetime.now()),
                                                       alert=f'<{ip_addr}:{port} {datacls.account_name}>: Success authorize client!')
+            user.is_auth = True
             self._session.commit()
         else:
-            # если совпадений не найдено - ответ 403 клиенту и вызываем отправку
+            # если совпадений не найдено - ответ 402 клиенту и вызываем отправку
             self._logger.error('Authorization failed. Client %s:%s', str(ip_addr), str(port))
-            response_dataclass = ErrorClientMessage(response=403,
+            response_dataclass = ErrorClientMessage(response=402,
                                                     time=str(datetime.now()),
                                                     error=f'<{ip_addr}:{port}>: Wrong login or password!')
         self._message_sender.send(response_dataclass)
@@ -75,8 +77,14 @@ class ServerMessageHandler:
     def unregister(self, datacls):
         pass
 
-    def on_peer(self, datacls):
-        pass
+    def on_peer(self, datacls, ip_addr, port, server_queue=None):
+        """ обработка сообщений p2p. оповещение сервера через очередь о необходимости отправки одному клиенту """
+        server_queue.put({'action': 'p2p',
+                          'author_login': datacls.author,
+                          'author_ip': ip_addr,
+                          'author_port': port,
+                          'target_login': datacls.target,
+                          'message': datacls.message})
 
     def remove_contact_from_client(self, datacls, ip_addr, port):
         """ удаляет контакт из clients_contacts """
@@ -166,12 +174,16 @@ class ServerMessageHandler:
 
 
 class ClientMessageHandler:
-    # обработка сообщений от сервера на склиенте
-    def status_200(self, dataclass):
-        pass
+    """ обработка сообщений от сервера на склиенте """
 
-    def status_400(self, dataclass):
-        pass
+    def __init__(self):
+        self._client_logger = logging.getLogger('client_log')
+
+    def status_2xx(self, datacls, ui_notifier=None):
+        ui_notifier.notify_success(alert=datacls.alert)
+
+    def status_402(self, datacls, ui_notifier=None):
+        ui_notifier.notify_failed_auth()
 
 
 class MessageRouter:
@@ -183,9 +195,10 @@ class MessageRouter:
                  client_msg_handler=ClientMessageHandler()):
         self.server_msg_handler = server_msg_handler
         self.client_msg_handler = client_msg_handler
-        self._logger = logging.getLogger('server_log')
+        self._server_logger = logging.getLogger('server_log')
+        self._client_logger = logging.getLogger('client_log')
 
-    def on_msg(self, datacls, ip_addr, port):
+    def on_msg(self, datacls, ip_addr, port, ui_notifier=None, server_queue=None):
         """ отправляет входящий dataclass в обработчик"""
         try:
             # server routing
@@ -196,7 +209,11 @@ class MessageRouter:
                 self.server_msg_handler.on_chat(datacls, ip_addr, port)
 
             elif isinstance(datacls, P2PMessage):
-                self.server_msg_handler.on_peer(datacls)
+                self._server_logger.debug('Routing datacls P2PMessage')
+                self.server_msg_handler.on_peer(datacls=datacls,
+                                                ip_addr=ip_addr,
+                                                port=port,
+                                                server_queue=server_queue)
 
             elif isinstance(datacls, BaseClientMessage):
                 if datacls.action == 'get_contacts':
@@ -205,18 +222,29 @@ class MessageRouter:
                     self.server_msg_handler.unregister(datacls)
 
             elif isinstance(datacls, AddContactMessage):
-                self._logger.debug('Routing datacls AddOrRemoveContact')
+                self._server_logger.debug('Routing datacls AddOrRemoveContact')
                 self.server_msg_handler.add_contact_to_client(datacls, ip_addr, port)
 
             elif isinstance(datacls, RemoveContactMessage):
-                self._logger.debug('Routing datacls AddOrRemoveContact')
+                self._server_logger.debug('Routing datacls AddOrRemoveContact')
                 self.server_msg_handler.remove_contact_from_client(datacls, ip_addr, port)
 
-            else:
-                self.server_msg_handler.on_unhandled_msg(datacls)
-
             # client routing
+            elif isinstance(datacls, SuccessServerMessage):
+                self._client_logger.debug('Routing datacls success')
+                self.client_msg_handler.status_2xx(datacls, ui_notifier=ui_notifier)
+
+            elif isinstance(datacls, ErrorServerMessage):
+                if datacls.response == 402:
+                    self._client_logger.debug('Routing datacls failed auth')
+                    self.client_msg_handler.status_402(datacls, ui_notifier=ui_notifier)
+                else:
+                    self._client_logger.debug('Routing datacls errors')
+                    # self.client_msg_handler.status_402(datacls, ui_notifier=ui_notifier)
+
+            # other messages
+            else:
+                self.server_msg_handler.on_unhandled_msg(datacls, ip_addr, port)
 
         except AttributeError as e:
-            self._logger.error('Attr error %s', e)
-            self.server_msg_handler.on_unhandled_msg(dataclass, ip_addr, port)
+            self._server_logger.error('Attr error %s', e)

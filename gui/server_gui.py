@@ -2,7 +2,7 @@ import sys
 from pathlib import Path
 from icecream import ic
 
-from PyQt5 import uic
+from PyQt5 import uic, QtCore
 from PyQt5.QtWidgets import QMainWindow, QTableWidgetItem
 from sqlalchemy.orm import sessionmaker
 

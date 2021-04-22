@@ -31,23 +31,7 @@
        </widget>
       </item>
       <item>
-       <widget class="QLabel" name="chatHistoryLabel">
-        <property name="sizePolicy">
-         <sizepolicy hsizetype="Expanding" vsizetype="Preferred">
-          <horstretch>0</horstretch>
-          <verstretch>0</verstretch>
-         </sizepolicy>
-        </property>
-        <property name="styleSheet">
-         <string notr="true">background-color: rgb(255, 255, 255);</string>
-        </property>
-        <property name="frameShape">
-         <enum>QFrame::Box</enum>
-        </property>
-        <property name="text">
-         <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;&lt;br/&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
-        </property>
-       </widget>
+       <widget class="QListWidget" name="chatHistoryList"/>
       </item>
      </layout>
     </item>
@@ -83,7 +67,7 @@
      <x>0</x>
      <y>0</y>
      <width>862</width>
-     <height>20</height>
+     <height>22</height>
     </rect>
    </property>
   </widget>
