@@ -1,18 +1,20 @@
 ﻿""" Серверная часть """
-import json
 import sys
+from queue import Queue
 
 from PyQt5.QtWidgets import QApplication
-from icecream import ic
 from select import select
 import socket
 import threading
-import logging
-import logs.config_server_log
-from lib.processors.message_sender import SendBuffer, Serializer, MessageSender
+
+from icecream import ic
+from sqlalchemy.orm import sessionmaker
+
+from db.client_db import ClientStorage, ClientHistoryStorage
+from lib.processors.message_sender import MessageSender
 from lib.variables import *
 from lib.processors.receive_message_processor import MessageSplitter
-from server_gui import MainWindow
+from gui.server_gui import MainWindow
 
 
 class Server:
@@ -22,9 +24,11 @@ class Server:
         self.server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         self.clients = []
+        self.nicknames = []
         self.msg_splitter = MessageSplitter()
         self.message_sender = MessageSender()
         self.send_buffer = self.message_sender.send_buffer
+        self.server_queue = Queue()
 
     def broadcast(self, message):
         """ отправляет сообщение всем участникам """
@@ -35,9 +39,14 @@ class Server:
         """ отключает сокет """
         # TODO как получить адрес клиента если он отключился?
         self.logger.info('Client disconnected')
-        index = self.clients.index(sock)
+        # index = self.clients.index(sock)
         sock.close()
-        self.clients.remove(sock)
+        if sock in self.clients:
+            ind = self.clients.index(sock)
+            login = self.nicknames[ind]
+            self.nicknames.remove(login)
+            self.clients.remove(sock)
+
         # self.broadcast(f'Client {nickname} disconnected!'.encode(ENCODING_FORMAT))
 
     def clients_read(self, r_sockets):
@@ -48,9 +57,12 @@ class Server:
                 data = sock.recv(MAX_MSG_SIZE)  # читаем запакованные через struct данные
 
                 # скармливаем данные с целью выполнить действия и сформировать ответ клиентам
-                self.msg_splitter.feed(data)
+                self.msg_splitter.feed(data=data, server_queue=self.server_queue)
                 requests[sock] = self.send_buffer.data[0]
                 self.send_buffer.bytes_sent()
+            except IndexError:
+                # если буфер отправки пуст - ничего не делаем
+                pass
             except:
                 # удаляем сокет из переченя если клиент отключился
                 self.disconnect_socket(sock)
@@ -67,17 +79,36 @@ class Server:
             # удаляем сокет из переченя если клиент отключился
             self.disconnect_socket(sock)
 
+    @staticmethod
+    def create_db_connection():
+        """ return session """
+        Session = sessionmaker(bind=ENGINE)
+        session = Session()
+        return session
+
     def authenticate_client(self, client_sock, addr):
         """ запрос и обработка результата авторизации пользователя при подключении к серверу """
         self.logger.info('Try to authenticate client %s', str(addr))
 
         client_sock.send('AUTH'.encode(ENCODING_FORMAT))  # запрашиваем действие авторизации
-        auth_data = client_sock.recv(MAX_MSG_SIZE)  # получаем ответ
+        auth_data = client_sock.recv(MAX_MSG_SIZE)  # получаем ответ. первый - словарь-запрос авторизации
+        client_login = client_sock.recv(MAX_MSG_SIZE).decode(
+            ENCODING_FORMAT)  # получаем ответ. второй - логин пользователя
 
         self.msg_splitter.feed(auth_data)  # отправляет данные на обработку
         client_sock.send(self.send_buffer.data[0])  # читаем буфер ответов после обработки и направляем ответ клиенту
         self.send_buffer.bytes_sent()  # удаляем прочитанный ответ из буфера
-        self.clients.append(client_sock)
+
+        # делаем запрос в БД:
+        #   если авторизация прошла успешно -
+        #   добавляем сокет в список подключенных и запрашиваем список контактов
+        client_storage = ClientStorage(self.create_db_connection())
+        if client_storage.get_client(client_login).is_auth:
+            self.clients.append(client_sock)
+            self.nicknames.append(client_login)
+            self.get_client_contacts(client_sock, addr)
+        else:
+            self.disconnect_socket(client_sock)
 
     def get_client_contacts(self, client_sock, addr):
         """ запрос к БД и отправка списка контактов клиенту """
@@ -90,7 +121,28 @@ class Server:
         client_sock.send(self.send_buffer.data[0])
         self.send_buffer.bytes_sent()
 
-    def run(self):
+    def server_queue_handler(self, stopper):
+        """ обработка очереди сервера (наполняется из message_handler) """
+        while not stopper.is_set():
+            if not self.server_queue.empty():
+                ic('que not empty')
+                queue_item = self.server_queue.get_nowait()
+                if isinstance(queue_item, dict):
+                    try:
+                        if queue_item['action'] == 'p2p':
+                            sock_ind = self.nicknames.index(queue_item['target_login'])
+                            target_sock = self.clients[sock_ind]
+                            target_ip, target_port = target_sock.getsockname()
+                            self.server.sendto(
+                                queue_item['message'].encode(ENCODING_FORMAT),
+                                (target_ip, target_port)
+                            )
+                    except KeyError:
+                        self.logger.debug('Error while handling server queue. Key err.')
+                    except ValueError:
+                        self.logger.debug('target is offline')
+
+    def run(self, event):
         """ основной поток обработки входящих соединений """
         print('Server is listening...')
 
@@ -98,19 +150,18 @@ class Server:
         self.server.listen(MAX_CONNECTIONS)
         self.server.settimeout(0.2)
 
-        while True:
+        server_queue_thr = threading.Thread(target=self.server_queue_handler, args=(event,))
+        server_queue_thr.start()
+
+        while not event.is_set():
             try:
                 client, addr = self.server.accept()
                 print(f'Connected with {str(addr)}')
-
                 self.authenticate_client(client_sock=client, addr=addr)
-                self.get_client_contacts(client_sock=client, addr=addr)
-            except ValueError as e:
-                print(e)
-            except OSError as e:
+            except OSError:
                 pass
             except KeyboardInterrupt:
-                sys.exit()
+                event.set()
             except Exception as e:
                 print(e)
             finally:
@@ -119,7 +170,7 @@ class Server:
                 try:
                     r_sockets, w_sockets, e = select(self.clients, self.clients, [], 0)
                 except:
-                    pass  # ничего не делать если клиент отключился
+                    self.clients.remove(client)  # если клиент отключился
                 responses = self.clients_read(r_sockets)
                 if responses:
                     self.clients_write(responses, w_sockets)
@@ -127,10 +178,14 @@ class Server:
 
 if __name__ == "__main__":
     server = Server(SERVER_ADDR)
-    serv_thr = threading.Thread(target=server.run)
+    server_kill = threading.Event()
+    serv_thr = threading.Thread(target=server.run, args=(server_kill,))
     serv_thr.start()
 
-    app = QApplication(sys.argv)
-    mw = MainWindow()
-    mw.show()
-    sys.exit(app.exec_())
+    # app = QApplication(sys.argv)
+    # mw = MainWindow()
+    # mw.show()
+    # app.exec_()
+    #
+    # server_kill.set()
+    # serv_thr.join()

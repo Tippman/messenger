@@ -23,13 +23,17 @@ class Deserializer:
         self._disconnector = disconnector
         self._logger = logging.getLogger('server_log')
 
-    def on_msg(self, ip_pack: bytes or None, port: int or None, msg_data: bytes):
+    def on_msg(self, ip_pack: bytes = None, port: int = None, msg_data: bytes = None, ui_notifier=None, server_queue=None):
         """ преобразует байты в словарь и отправляет его для сборки датакласса  """
         ip_addr = ipaddress.IPv4Address(ip_pack)
         try:
             msg_string = msg_data.decode(self._encoding)
             msg_dict = self._loads(msg_string)
-            self._msg_factory.on_msg(msg_dict=msg_dict, ip_addr=ip_addr, port=port)
+            self._msg_factory.on_msg(msg_dict=msg_dict,
+                                     ip_addr=ip_addr,
+                                     port=port,
+                                     ui_notifier=ui_notifier,
+                                     server_queue=server_queue)
         except Exception as e:
             self._disconnector.disconnect(ip_addr, port, e)
 
@@ -43,8 +47,8 @@ class MessageSplitter:
         self.deserializer = deserializer
         self._logger = logging.getLogger('server_log')
 
-    def feed(self, data):
-        """ разбивает входящие данные на размер сообщения, ip слиента, port клиента и само сообщение """
+    def feed(self, data, ui_notifier=None, server_queue=None):
+        """ разбивает входящие данные на размер сообщения, ip клиента, port клиента и само сообщение """
         msg_len, ip_pack, port, data_body = struct.unpack(self.pack_format, data)
         data_body = data_body[:msg_len]
-        self.deserializer.on_msg(ip_pack=ip_pack, port=port, msg_data=data_body)
+        self.deserializer.on_msg(ip_pack=ip_pack, port=port, msg_data=data_body, ui_notifier=ui_notifier, server_queue=server_queue)
