@@ -103,7 +103,7 @@ class Client:
 
     def run(self):
         try:
-            self.client.close()
+            # self.client.close()
             self.client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             self.client.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
             self.client.connect(self.SERVER_ADDR)
@@ -131,24 +131,26 @@ class Client:
                 if isinstance(queue_item, dict):
                     try:
                         action = queue_item['action']
+                        ic(action)
                         if action in ACTION_LIST and action == 'p2p':
                             request_dict = self.client_msg_factory.create_p2p_msg(target=queue_item['target'],
-                                                                   msg=queue_item['msg'],
-                                                                   author=self.login)
+                                                                                  msg=queue_item['msg'],
+                                                                                  author=self.login)
                             data = self.serializer.pack_data(request_dict, self.client_ip, self.client_port)
                             self.client.send(data)
                             self.logger.debug('sending p2p request')
-
+                        elif action in ACTION_LIST and action == 'add_new_client':
+                            request_dict = self.client_msg_factory.create_register_msg(
+                                login=queue_item['login'],
+                                password=queue_item['password'])
+                            data = self.serializer.pack_data(request_dict, self.client_ip, self.client_port)
+                            self.client.send(data)
+                            self.logger.debug('sending register request')
                     except KeyError:
                         self.logger.debug('Error while getting a key from a queue item')
 
 
 if __name__ == '__main__':
-    # client.run()
-
-    # client_main_loop = threading.Thread(target=client.run())
-    # client_main_loop.start()
-
     client_login_app = QApplication(sys.argv)
     ui_notifier = UiNotifier(app=client_login_app)
     client = Client(ui_notifier=ui_notifier)

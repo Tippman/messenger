@@ -1,4 +1,5 @@
 from datetime import datetime
+from hmac import compare_digest
 
 from sqlalchemy import Column, Integer, String, select, DateTime, ForeignKey, Table, Boolean
 from sqlalchemy.exc import IntegrityError
@@ -47,7 +48,7 @@ class ClientStorage:
         return [contact.login for contact in client.contacts.all()]
 
     def is_client_exist(self, login) -> bool:
-        """ проверяет если клиент в базе. возвращает True/False """
+        """ проверяет есть ли клиент в базе """
         return True if self.get_client(login) else False
 
     def delete_client(self, login) -> None:
@@ -60,18 +61,18 @@ class ClientStorage:
         result = self._session.execute(user)
         return result.scalars().first()
 
-    def add_client(self, login, password) -> None:
+    def add_client(self, login, hash_password) -> None:
         """ добавляет клиента в БД или выбрасывет исключение если такой клиент уже есть """
         try:
-            self._session.add(Client(login=login, password=password))
+            self._session.add(Client(login=login, password=hash_password))
         except IntegrityError:
             raise ValueError(f'User with login="{login}" already exists')
 
-    def check_auth_data(self, login, password) -> bool:
+    def check_auth_data(self, login, hash_password) -> bool:
         """ проверяет логин и пароль при авторизации. Возвращает True если логин и пароль верные """
         if self.is_client_exist(login):
             client = self.get_client(login)
-            if client.login == login and client.password == password:
+            if client.login == login and compare_digest(client.password, hash_password):
                 return True
         return False
 

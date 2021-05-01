@@ -23,6 +23,7 @@ class Server:
         self.SERVER_ADDR = SERVER_ADDR
         self.server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        self.server.setblocking(0)
         self.clients = []
         self.nicknames = []
         self.msg_splitter = MessageSplitter()
@@ -89,25 +90,35 @@ class Server:
     def authenticate_client(self, client_sock, addr):
         """ запрос и обработка результата авторизации пользователя при подключении к серверу """
         self.logger.info('Try to authenticate client %s', str(addr))
-
         client_sock.send('AUTH'.encode(ENCODING_FORMAT))  # запрашиваем действие авторизации
         auth_data = client_sock.recv(MAX_MSG_SIZE)  # получаем ответ. первый - словарь-запрос авторизации
         client_login = client_sock.recv(MAX_MSG_SIZE).decode(
             ENCODING_FORMAT)  # получаем ответ. второй - логин пользователя
 
         self.msg_splitter.feed(auth_data)  # отправляет данные на обработку
-        client_sock.send(self.send_buffer.data[0])  # читаем буфер ответов после обработки и направляем ответ клиенту
-        self.send_buffer.bytes_sent()  # удаляем прочитанный ответ из буфера
+        try:
+            client_sock.send(
+                self.send_buffer.data[0])  # читаем буфер ответов после обработки и направляем ответ клиенту
+            self.send_buffer.bytes_sent()  # удаляем прочитанный ответ из буфера
+        except IndexError:
+            ic('nothing to send (auth failed)')
 
         # делаем запрос в БД:
         #   если авторизация прошла успешно -
         #   добавляем сокет в список подключенных и запрашиваем список контактов
-        client_storage = ClientStorage(self.create_db_connection())
-        if client_storage.get_client(client_login).is_auth:
-            self.clients.append(client_sock)
-            self.nicknames.append(client_login)
-            self.get_client_contacts(client_sock, addr)
+        db_conn = self.create_db_connection()
+        client_storage = ClientStorage(db_conn)
+        if client_storage.is_client_exist(client_login):
+            if client_storage.get_client(client_login).is_auth:
+                self.clients.append(client_sock)
+                self.nicknames.append(client_login)
+                self.get_client_contacts(client_sock, addr)
+                self.logger.info('Success authorize client %s', client_login)
+            else:
+                self.logger.info('Authorization client %s failed', client_login)
+                self.disconnect_socket(client_sock)
         else:
+            self.logger.info('No such user %s', client_login)
             self.disconnect_socket(client_sock)
 
     def get_client_contacts(self, client_sock, addr):
@@ -157,13 +168,25 @@ class Server:
             try:
                 client, addr = self.server.accept()
                 print(f'Connected with {str(addr)}')
-                self.authenticate_client(client_sock=client, addr=addr)
+                ready = select([client], [], [], 1)
+                if ready[0]:
+                    self.logger.debug('server get a response from client after connect')
+                    request_data = client.recv(MAX_MSG_SIZE)
+                    self.msg_splitter.feed(request_data,)
+                    client.send(self.send_buffer.data[0])
+                    self.send_buffer.bytes_sent()
+                    self.disconnect_socket(client)
+                    continue
+                else:
+                    self.authenticate_client(client_sock=client, addr=addr)
+
             except OSError:
                 pass
             except KeyboardInterrupt:
                 event.set()
             except Exception as e:
-                print(e)
+                # print(e)
+                raise
             finally:
                 r_sockets = []
                 w_sockets = []
