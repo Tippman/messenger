@@ -30,7 +30,8 @@ class ClientMessageFactory:
         except ValueError:
             return None
 
-    def create_auth_message(self, account_name, password):
+    @staticmethod
+    def create_auth_message(account_name, password):
         """ возвращает сообщение-словарь авторизации """
         data = {
             'action': 'authenticate',
@@ -42,29 +43,41 @@ class ClientMessageFactory:
         }
         return data
 
-    def create_request_add_or_remove_client_contact(self, action, author_login, target_login):
+    @staticmethod
+    def create_request_add_or_remove_client_contact(action, author_login, target_login):
         """ возвращает словарь с запросом на добавление или удаление контактов пользователя """
         return {'action': action,
                 'time': str(datetime.datetime.now()),
                 'user_login': author_login,
                 'target_login': target_login}
 
-    def create_request_get_client_contacts(self, account_name):
+    @staticmethod
+    def create_request_get_client_contacts(account_name):
         """ возвращает словарь с запросом списка контактов пользователя """
         return {'action': 'get_contacts',
                 'time': str(datetime.datetime.now()),
                 'user_login': account_name}
 
-    def create_on_chat_msg(self, msg_body):
+    @staticmethod
+    def create_on_chat_msg(msg_body):
         """ возвращает сообщение-словарь on_chat """
         return {'action': 'on_chat',
                 'time': str(datetime.datetime.now()),
                 'message': msg_body}
 
-    def create_p2p_msg(self, target, msg, author):
+    @staticmethod
+    def create_p2p_msg(target, msg, author):
         """ возвращает сообщение словарь p2p """
         return {'action': 'p2p',
                 'time': str(datetime.datetime.now()),
                 'author': author,
                 'target': target,
                 'message': msg}
+
+    @staticmethod
+    def create_register_msg(login, password):
+        """ создает сообщение словарь регистриции пользователя """
+        return {'action': 'add_new_client',
+                'time': str(datetime.datetime.now()),
+                'author': login,
+                'password': password}

@@ -61,6 +61,14 @@ class AuthenticateMessage:
     password: str
 
 
+@dataclass()
+class RegisterMessage:
+    action: str
+    time: str
+    author: str
+    password: str
+
+
 # ответы/запросы сервера
 # “action”: “prоbe” — проверка присутствия. Сервисное сообщение от сервера для проверки присутствии клиента online;
 @dataclass()

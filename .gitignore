@@ -6,3 +6,4 @@ hw_l2.zip
 test.py
 test_pyqt.py
 logs/log_files
+messenger.sqlite3

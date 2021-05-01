@@ -45,8 +45,13 @@ ACTION_LIST = [
     'get_contacts',
     'add_contact',
     'del_contact',
+    'add_new_client',
     # server actions
     'probe',
     'on_chat',
     'on_group',
 ]
+
+# TODO вынести соль в переменную окрудения сервера
+SALT = 'secret_salt'
+HASH_FUNC = 'sha256'

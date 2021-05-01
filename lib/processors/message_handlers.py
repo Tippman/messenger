@@ -1,3 +1,4 @@
+import hashlib
 import json
 
 from icecream import ic
@@ -13,7 +14,7 @@ from sqlalchemy.orm import sessionmaker
 
 from lib.processors.disconnector import Disconnector
 from lib.processors.message_dataclasses import *
-from lib.variables import ENGINE
+from lib.variables import ENGINE, ENCODING_FORMAT, SALT, HASH_FUNC
 from db.base import Base
 from db.client_db import Client, ClientStorage, ClientHistoryStorage
 
@@ -48,10 +49,15 @@ class ServerMessageHandler:
         else:
             self._disconnector.disconnect(ip_addr, port, f'user with login "{datacls.author}" does not exists')
 
-    def authenticate_client(self, datacls, ip_addr=None, port=None):
+    def authenticate_client(self, datacls, ip_addr=None, port=None, server_queue=None):
         """ проверяет данные авторизации клиента в БД,
         в случае совпадения инициирует сборку сервера об успешной авторизации """
-        if self._client_storage.check_auth_data(datacls.account_name, datacls.password):
+        hash_password = hashlib.pbkdf2_hmac(HASH_FUNC,
+                                            bytes(datacls.password, encoding=ENCODING_FORMAT),
+                                            bytes(SALT, encoding=ENCODING_FORMAT),
+                                            100000).hex()
+
+        if self._client_storage.check_auth_data(datacls.account_name, hash_password):
             # если найдено совпадение логина и пароля - формируем ответ 200 клиенту и вызываем отправку
             self._logger.info('Success authorize client %s:%s', str(ip_addr), str(port))
             user = self._client_storage.get_client(datacls.account_name)
@@ -63,16 +69,44 @@ class ServerMessageHandler:
                                                       alert=f'<{ip_addr}:{port} {datacls.account_name}>: Success authorize client!')
             user.is_auth = True
             self._session.commit()
+            self._session.close()
+            self._message_sender.send(response_dataclass)
+            server_queue.put({'action': 'success_auth',
+                              'login': datacls.account_name,
+                              'ip_addr': ip_addr,
+                              'port': port})
         else:
-            # если совпадений не найдено - ответ 402 клиенту и вызываем отправку
+            # если совпадений не найдено - ответ 402 клиенту и дисконнект
             self._logger.error('Authorization failed. Client %s:%s', str(ip_addr), str(port))
             response_dataclass = ErrorClientMessage(response=402,
                                                     time=str(datetime.now()),
                                                     error=f'<{ip_addr}:{port}>: Wrong login or password!')
-        self._message_sender.send(response_dataclass)
+            self._message_sender.send(response_dataclass)
+            self._disconnector.disconnect(ip_addr, port, server_queue=server_queue)
 
-    def register(self, datacls):
-        pass
+    def register(self, datacls, ip_addr, port, server_queue=None):
+        """ регистрация нового пользователя (создание hmac и занесение в БД) """
+        login = datacls.author
+        if self._client_storage.is_client_exist(login):
+            self._logger.debug('Username %s already exists.', login)
+            response_datacls = ErrorServerMessage(response=409,
+                                                  time=str(datetime.now()),
+                                                  error='Username already exists!')
+        else:
+            raw_password = datacls.password
+            hash_password = hashlib.pbkdf2_hmac(HASH_FUNC,
+                                                bytes(raw_password, encoding=ENCODING_FORMAT),
+                                                bytes(SALT, encoding=ENCODING_FORMAT),
+                                                100000).hex()
+            self._client_storage.add_client(login, hash_password)
+            self._session.commit()
+            response_datacls = SuccessServerMessage(response=201, time=str(datetime.now()), alert='user created')
+            self._logger.info('New user "%s" created.', login)
+
+        self._session.close()
+        self._message_sender.send(response_datacls)
+
+        self._disconnector.disconnect(ip_addr=ip_addr, port=port, server_queue=server_queue)
 
     def unregister(self, datacls):
         pass
@@ -128,7 +162,7 @@ class ServerMessageHandler:
         # отправляем ответ
         self._message_sender.send(response_dataclass)
 
-    def add_contact_to_client(self, datacls, ip_addr, port):
+    def add_contact_to_client(self, datacls, ip_addr=None, port=None):
         """ довавляет контакт из clients_contacts """
         if self._client_storage.is_client_exist(datacls.target_login):
             current_client = self._client_storage.get_client(datacls.author)
@@ -180,10 +214,13 @@ class ClientMessageHandler:
         self._client_logger = logging.getLogger('client_log')
 
     def status_2xx(self, datacls, ui_notifier=None):
-        ui_notifier.notify_success(alert=datacls.alert)
+        ui_notifier.notify_success(response=datacls.response, alert=datacls.alert)
 
     def status_402(self, datacls, ui_notifier=None):
         ui_notifier.notify_failed_auth()
+
+    def status_409(self, datacls, ui_notifier=None):
+        ui_notifier.notify_failed_register(error=datacls.error)
 
 
 class MessageRouter:
@@ -203,7 +240,7 @@ class MessageRouter:
         try:
             # server routing
             if isinstance(datacls, AuthenticateMessage):
-                self.server_msg_handler.authenticate_client(datacls, ip_addr, port)
+                self.server_msg_handler.authenticate_client(datacls, ip_addr, port, server_queue=server_queue)
 
             elif isinstance(datacls, OnChatMessage):
                 self.server_msg_handler.on_chat(datacls, ip_addr, port)
@@ -229,6 +266,12 @@ class MessageRouter:
                 self._server_logger.debug('Routing datacls AddOrRemoveContact')
                 self.server_msg_handler.remove_contact_from_client(datacls, ip_addr, port)
 
+            elif isinstance(datacls, RegisterMessage):
+                self._server_logger.debug('Routing datacls RegisterMessage')
+                self.server_msg_handler.register(datacls, ip_addr, port, server_queue=server_queue)
+
+
+
             # client routing
             elif isinstance(datacls, SuccessServerMessage):
                 self._client_logger.debug('Routing datacls success')
@@ -238,6 +281,9 @@ class MessageRouter:
                 if datacls.response == 402:
                     self._client_logger.debug('Routing datacls failed auth')
                     self.client_msg_handler.status_402(datacls, ui_notifier=ui_notifier)
+                elif datacls.response == 409:
+                    self._client_logger.debug('Routing datacls failed. Already exists.')
+                    self.client_msg_handler.status_409(datacls, ui_notifier=ui_notifier)
                 else:
                     self._client_logger.debug('Routing datacls errors')
                     # self.client_msg_handler.status_402(datacls, ui_notifier=ui_notifier)
@@ -247,4 +293,4 @@ class MessageRouter:
                 self.server_msg_handler.on_unhandled_msg(datacls, ip_addr, port)
 
         except AttributeError as e:
-            self._server_logger.error('Attr error %s', e)
+            self._client_logger.error('Attr error %s', e)

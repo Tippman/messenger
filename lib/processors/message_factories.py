@@ -37,7 +37,8 @@ class MessageFactory:
                         account_name=msg_dict['user']['account_name'],
                         password=msg_dict['user']['password'],
                     )
-                    self.msg_router.on_msg(datacls=request_datacls, ip_addr=ip_addr, port=port)
+                    self.msg_router.on_msg(datacls=request_datacls, ip_addr=ip_addr, port=port,
+                                           server_queue=server_queue)
 
                 elif action == 'on_chat':
                     self.logger.debug('factoring "%s" dataclass for %s:%s', action, str(ip_addr), str(port))
@@ -47,7 +48,7 @@ class MessageFactory:
                             time=msg_dict['time'],
                             author=msg_dict['user']['account_name'],
                             message=msg_dict['message']
-                        ), ip_addr=ip_addr, port=port)
+                        ), ip_addr=ip_addr, port=port, server_queue=server_queue)
 
                 elif action == 'p2p':
                     self.logger.debug('factoring "%s" dataclass for %s:%s', action, str(ip_addr), str(port))
@@ -67,14 +68,15 @@ class MessageFactory:
                             action=action,
                             time=msg_dict['time'],
                             author=msg_dict['user']['account_name'],
-                        ), ip_addr=ip_addr, port=port)
+                        ), ip_addr=ip_addr, port=port, server_queue=server_queue)
 
                 elif action == 'get_contacts':
                     self.logger.debug('factoring "%s" dataclass for %s:%s', action, str(ip_addr), str(port))
                     request_dataclass = BaseClientMessage(action=action,
                                                           time=msg_dict['time'],
                                                           author=msg_dict['user_login'])
-                    self.msg_router.on_msg(datacls=request_dataclass, ip_addr=ip_addr, port=port)
+                    self.msg_router.on_msg(datacls=request_dataclass, ip_addr=ip_addr, port=port,
+                                           server_queue=server_queue)
 
                 elif action == 'add_contact':
                     self.logger.debug('factoring "%s" dataclass for %s:%s', action, str(ip_addr), str(port))
@@ -82,7 +84,8 @@ class MessageFactory:
                                                           time=msg_dict['time'],
                                                           author=msg_dict['user_login'],
                                                           target_login=msg_dict['target_login'])
-                    self.msg_router.on_msg(datacls=request_dataclass, ip_addr=ip_addr, port=port)
+                    self.msg_router.on_msg(datacls=request_dataclass, ip_addr=ip_addr, port=port,
+                                           server_queue=server_queue)
 
                 elif action == 'del_contact':
                     self.logger.debug('factoring "%s" dataclass for %s:%s', action, str(ip_addr), str(port))
@@ -90,8 +93,16 @@ class MessageFactory:
                                                              time=msg_dict['time'],
                                                              author=msg_dict['user_login'],
                                                              target_login=msg_dict['target_login'])
-                    self.msg_router.on_msg(datacls=request_dataclass, ip_addr=ip_addr, port=port)
-
+                    self.msg_router.on_msg(datacls=request_dataclass, ip_addr=ip_addr, port=port,
+                                           server_queue=server_queue)
+                elif action == 'add_new_client':
+                    self.logger.debug('factoring "%s" dataclass for %s:%s', action, str(ip_addr), str(port))
+                    request_dataclass = RegisterMessage(action=action,
+                                                        time=msg_dict['time'],
+                                                        author=msg_dict['author'],
+                                                        password=msg_dict['password'])
+                    self.msg_router.on_msg(datacls=request_dataclass, ip_addr=ip_addr, port=port,
+                                           server_queue=server_queue)
 
                 # actions, отправленные cервером
                 elif action == 'probe':
@@ -118,7 +129,11 @@ class MessageFactory:
                                                           alert=msg_dict['alert'])
                 self.msg_router.on_msg(datacls=response_dataclass, ip_addr=ip_addr, port=port, ui_notifier=ui_notifier)
             elif server_response == 201:
-                print('Created')
+                self.logger.debug('Get response 201 from server in routing. Created!')
+                response_dataclass = SuccessServerMessage(response=201,
+                                                          time=msg_dict['time'],
+                                                          alert=msg_dict['alert'])
+                self.msg_router.on_msg(datacls=response_dataclass, ip_addr=ip_addr, port=port, ui_notifier=ui_notifier)
             elif server_response == 202:
                 print('accepted')
                 print(msg_dict['alert'])
@@ -126,6 +141,12 @@ class MessageFactory:
                 print(msg_dict['error'])
                 response_dataclass = ErrorServerMessage(response=402, time=msg_dict['time'],
                                                         error='Wrong login or password')
+                self.msg_router.on_msg(datacls=response_dataclass, ip_addr=ip_addr, port=port, ui_notifier=ui_notifier)
+            elif server_response == 409:
+                self.logger.debug('Factoring catch an error. Already exists.')
+                response_dataclass = ErrorServerMessage(response=409,
+                                                        time=msg_dict['time'],
+                                                        error=msg_dict['error'])
                 self.msg_router.on_msg(datacls=response_dataclass, ip_addr=ip_addr, port=port, ui_notifier=ui_notifier)
 
         except Exception as e:
