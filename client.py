@@ -32,8 +32,7 @@ class Client:
                  ui_notifier=None):
         self.SERVER_ADDR = SERVER_ADDR
         self.client_msg_factory = client_message_factory
-        self.client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        self.client.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        self.client = None
 
         self.msg_splitter = MessageSplitter()
         self.login = ''
@@ -45,10 +44,11 @@ class Client:
 
         self.serializer = serializer
         self.client_queue = Queue()
-        self.client_thr_killer = threading.Event()
+        self.client_thr_killer = None  # threading.Event()
         self.ui_notifier = ui_notifier
 
     def disconnect(self):
+        self.logger.info('disconnecting')
         self.client_thr_killer.set()
         self.client.close()
 
@@ -57,20 +57,15 @@ class Client:
             try:
                 message = self.client.recv(MAX_MSG_SIZE)
 
-                if message == 'AUTH'.encode(ENCODING_FORMAT):
-                    self.logger.info('%s: Receive auth response from server', str(self.client.getsockname()))
-
-                    auth_dict = self.client_msg_factory.create_auth_message(self.login, self.password)
-                    auth_data = self.serializer.pack_data(auth_dict, self.client_ip, self.client_port)
-                    self.client.send(auth_data)
-                    self.client.send(self.login.encode(ENCODING_FORMAT))
-
-                elif message == 'GET_CONTACTS'.encode(ENCODING_FORMAT):
+                if message == 'GET_CONTACTS'.encode(ENCODING_FORMAT):
                     self.logger.info('%s: Requesting client contact list', str(self.client.getsockname()))
 
                     request_dict = self.client_msg_factory.create_request_get_client_contacts(self.login)
                     request_data = self.serializer.pack_data(request_dict, self.client_ip, self.client_port)
                     self.client.send(request_data)
+
+                elif message == 'disconnect'.encode(ENCODING_FORMAT):
+                    self.disconnect()
 
                 else:
                     # если получен ответ от сервера - передаем его обработчику
@@ -103,7 +98,6 @@ class Client:
 
     def run(self):
         try:
-            # self.client.close()
             self.client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             self.client.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
             self.client.connect(self.SERVER_ADDR)
@@ -136,16 +130,21 @@ class Client:
                             request_dict = self.client_msg_factory.create_p2p_msg(target=queue_item['target'],
                                                                                   msg=queue_item['msg'],
                                                                                   author=self.login)
-                            data = self.serializer.pack_data(request_dict, self.client_ip, self.client_port)
-                            self.client.send(data)
                             self.logger.debug('sending p2p request')
                         elif action in ACTION_LIST and action == 'add_new_client':
                             request_dict = self.client_msg_factory.create_register_msg(
                                 login=queue_item['login'],
                                 password=queue_item['password'])
-                            data = self.serializer.pack_data(request_dict, self.client_ip, self.client_port)
-                            self.client.send(data)
                             self.logger.debug('sending register request')
+                        elif action in ACTION_LIST and action == 'authenticate':
+                            request_dict = self.client_msg_factory.create_auth_message(self.login, self.password)
+                            self.logger.info('sending auth request from user "%s"', self.login)
+                        else:
+                            request_dict = {}
+
+                        data = self.serializer.pack_data(request_dict, self.client_ip, self.client_port)
+                        self.client.send(data)
+
                     except KeyError:
                         self.logger.debug('Error while getting a key from a queue item')
 

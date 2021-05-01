@@ -44,8 +44,8 @@ class Server:
         sock.close()
         if sock in self.clients:
             ind = self.clients.index(sock)
-            login = self.nicknames[ind]
-            self.nicknames.remove(login)
+            # login = self.nicknames[ind]
+            # self.nicknames.remove(login)
             self.clients.remove(sock)
 
         # self.broadcast(f'Client {nickname} disconnected!'.encode(ENCODING_FORMAT))
@@ -87,40 +87,6 @@ class Server:
         session = Session()
         return session
 
-    def authenticate_client(self, client_sock, addr):
-        """ запрос и обработка результата авторизации пользователя при подключении к серверу """
-        self.logger.info('Try to authenticate client %s', str(addr))
-        client_sock.send('AUTH'.encode(ENCODING_FORMAT))  # запрашиваем действие авторизации
-        auth_data = client_sock.recv(MAX_MSG_SIZE)  # получаем ответ. первый - словарь-запрос авторизации
-        client_login = client_sock.recv(MAX_MSG_SIZE).decode(
-            ENCODING_FORMAT)  # получаем ответ. второй - логин пользователя
-
-        self.msg_splitter.feed(auth_data)  # отправляет данные на обработку
-        try:
-            client_sock.send(
-                self.send_buffer.data[0])  # читаем буфер ответов после обработки и направляем ответ клиенту
-            self.send_buffer.bytes_sent()  # удаляем прочитанный ответ из буфера
-        except IndexError:
-            ic('nothing to send (auth failed)')
-
-        # делаем запрос в БД:
-        #   если авторизация прошла успешно -
-        #   добавляем сокет в список подключенных и запрашиваем список контактов
-        db_conn = self.create_db_connection()
-        client_storage = ClientStorage(db_conn)
-        if client_storage.is_client_exist(client_login):
-            if client_storage.get_client(client_login).is_auth:
-                self.clients.append(client_sock)
-                self.nicknames.append(client_login)
-                self.get_client_contacts(client_sock, addr)
-                self.logger.info('Success authorize client %s', client_login)
-            else:
-                self.logger.info('Authorization client %s failed', client_login)
-                self.disconnect_socket(client_sock)
-        else:
-            self.logger.info('No such user %s', client_login)
-            self.disconnect_socket(client_sock)
-
     def get_client_contacts(self, client_sock, addr):
         """ запрос к БД и отправка списка контактов клиенту """
         self.logger.info('Getting client contact list %s', str(addr))
@@ -136,7 +102,6 @@ class Server:
         """ обработка очереди сервера (наполняется из message_handler) """
         while not stopper.is_set():
             if not self.server_queue.empty():
-                ic('que not empty')
                 queue_item = self.server_queue.get_nowait()
                 if isinstance(queue_item, dict):
                     try:
@@ -144,10 +109,24 @@ class Server:
                             sock_ind = self.nicknames.index(queue_item['target_login'])
                             target_sock = self.clients[sock_ind]
                             target_ip, target_port = target_sock.getsockname()
-                            self.server.sendto(
-                                queue_item['message'].encode(ENCODING_FORMAT),
-                                (target_ip, target_port)
-                            )
+                            self.server.sendto(queue_item['message'].encode(ENCODING_FORMAT),
+                                               (target_ip, target_port))
+                        elif queue_item['action'] == 'disconnect':
+                            ip_addr = str(queue_item['ip_addr'])
+                            port = queue_item['port']
+                            for sock in self.clients:
+                                sock_ip, sock_port = sock.getsockname()
+                                if sock_ip == ip_addr and sock_port == port:
+                                    sock.send(queue_item['action'].encode(ENCODING_FORMAT))
+                        elif queue_item['action'] == 'success_auth':
+                            client_login = queue_item['login']
+                            ip_addr = str(queue_item['ip_addr'])
+                            port = queue_item['port']
+                            for sock in self.clients:
+                                sock_ip, sock_port = sock.getsockname()
+                                if sock_ip == ip_addr and sock_port == port:
+                                    self.get_client_contacts(sock, (ip_addr, port))
+                                    self.logger.info('Success authorize client %s', client_login)
                     except KeyError:
                         self.logger.debug('Error while handling server queue. Key err.')
                     except ValueError:
@@ -172,13 +151,14 @@ class Server:
                 if ready[0]:
                     self.logger.debug('server get a response from client after connect')
                     request_data = client.recv(MAX_MSG_SIZE)
-                    self.msg_splitter.feed(request_data,)
+                    self.msg_splitter.feed(data=request_data, server_queue=self.server_queue)
                     client.send(self.send_buffer.data[0])
                     self.send_buffer.bytes_sent()
-                    self.disconnect_socket(client)
-                    continue
-                else:
-                    self.authenticate_client(client_sock=client, addr=addr)
+                    # self.disconnect_socket(client)
+                    # continue
+                # else:
+                #     self.authenticate_client(client_sock=client, addr=addr)
+                self.clients.append(client)
 
             except OSError:
                 pass

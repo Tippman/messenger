@@ -82,6 +82,7 @@ class MainLoginWindow(QWidget):
             self.errorArea.setText('')
             self.client.login = login
             self.client.password = password_1
+            self.client.client_thr_killer = threading.Event()
             self.client.run()
             self.client.client_queue.put({'action': 'add_new_client', 'login': login, 'password': password_1})
         else:
@@ -117,4 +118,6 @@ class MainLoginWindow(QWidget):
         self.client.login = self.loginLineEdit.text()
         self.client.password = self.passwordLineEdit.text()
 
+        self.client.client_thr_killer = threading.Event()
         self.client.run()
+        self.client.client_queue.put({'action': 'authenticate'})

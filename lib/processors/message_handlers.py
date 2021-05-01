@@ -49,7 +49,7 @@ class ServerMessageHandler:
         else:
             self._disconnector.disconnect(ip_addr, port, f'user with login "{datacls.author}" does not exists')
 
-    def authenticate_client(self, datacls, ip_addr=None, port=None):
+    def authenticate_client(self, datacls, ip_addr=None, port=None, server_queue=None):
         """ проверяет данные авторизации клиента в БД,
         в случае совпадения инициирует сборку сервера об успешной авторизации """
         hash_password = hashlib.pbkdf2_hmac(HASH_FUNC,
@@ -70,15 +70,21 @@ class ServerMessageHandler:
             user.is_auth = True
             self._session.commit()
             self._session.close()
+            self._message_sender.send(response_dataclass)
+            server_queue.put({'action': 'success_auth',
+                              'login': datacls.account_name,
+                              'ip_addr': ip_addr,
+                              'port': port})
         else:
-            # если совпадений не найдено - ответ 402 клиенту и вызываем отправку
+            # если совпадений не найдено - ответ 402 клиенту и дисконнект
             self._logger.error('Authorization failed. Client %s:%s', str(ip_addr), str(port))
             response_dataclass = ErrorClientMessage(response=402,
                                                     time=str(datetime.now()),
                                                     error=f'<{ip_addr}:{port}>: Wrong login or password!')
-        self._message_sender.send(response_dataclass)
+            self._message_sender.send(response_dataclass)
+            self._disconnector.disconnect(ip_addr, port, server_queue=server_queue)
 
-    def register(self, datacls, ip_addr, port):
+    def register(self, datacls, ip_addr, port, server_queue=None):
         """ регистрация нового пользователя (создание hmac и занесение в БД) """
         login = datacls.author
         if self._client_storage.is_client_exist(login):
@@ -99,6 +105,8 @@ class ServerMessageHandler:
 
         self._session.close()
         self._message_sender.send(response_datacls)
+
+        self._disconnector.disconnect(ip_addr=ip_addr, port=port, server_queue=server_queue)
 
     def unregister(self, datacls):
         pass
@@ -154,7 +162,7 @@ class ServerMessageHandler:
         # отправляем ответ
         self._message_sender.send(response_dataclass)
 
-    def add_contact_to_client(self, datacls, ip_addr, port):
+    def add_contact_to_client(self, datacls, ip_addr=None, port=None):
         """ довавляет контакт из clients_contacts """
         if self._client_storage.is_client_exist(datacls.target_login):
             current_client = self._client_storage.get_client(datacls.author)
@@ -232,7 +240,7 @@ class MessageRouter:
         try:
             # server routing
             if isinstance(datacls, AuthenticateMessage):
-                self.server_msg_handler.authenticate_client(datacls, ip_addr, port)
+                self.server_msg_handler.authenticate_client(datacls, ip_addr, port, server_queue=server_queue)
 
             elif isinstance(datacls, OnChatMessage):
                 self.server_msg_handler.on_chat(datacls, ip_addr, port)
@@ -260,7 +268,7 @@ class MessageRouter:
 
             elif isinstance(datacls, RegisterMessage):
                 self._server_logger.debug('Routing datacls RegisterMessage')
-                self.server_msg_handler.register(datacls, ip_addr, port)
+                self.server_msg_handler.register(datacls, ip_addr, port, server_queue=server_queue)
 
 
 

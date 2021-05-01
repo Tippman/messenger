@@ -17,7 +17,7 @@ class Disconnector:
     def get_disconnect_response(self):
         return self.disconnect_response if self.is_disconnected else None
 
-    def disconnect(self, ip_addr, port, error=None):
+    def disconnect(self, ip_addr, port, error=None, server_queue=None):
         """ возвращает ответ для отключения клиента """
         if error:
             self.logger.error('Client %s %s disconnected. Catch an error: %s', ip_addr, port, error)
@@ -27,3 +27,6 @@ class Disconnector:
         self.disconnect_response = {'response': 400,
                                     'time': str(datetime.now()),
                                     'error': f'<{ip_addr}:{port}>: wrong request or JSON-object'}
+        server_queue.put({'action': 'disconnect',
+                          'ip_addr': ip_addr,
+                          'port': port, })
