@@ -12,6 +12,7 @@ from lib.processors.disconnector import Disconnector
 
 class Deserializer:
     """ Десериалайзер входящих заголовков и сообщений """
+
     def __init__(self,
                  loads=json.loads,
                  encoding=ENCODING_FORMAT,
@@ -23,8 +24,9 @@ class Deserializer:
         self._disconnector = disconnector
         self._logger = logging.getLogger('server_log')
 
-    def on_msg(self, ip_pack: bytes = None, port: int = None, msg_data: bytes = None, ui_notifier=None, server_queue=None):
-        """ преобразует байты в словарь и отправляет его для сборки датакласса  """
+    def on_msg(self, ip_pack: bytes = None, port: int = None, msg_data: bytes = None, ui_notifier=None,
+               server_queue=None):
+        """Преобразует байты в словарь и отправляет его для сборки датакласса."""
         ip_addr = ipaddress.IPv4Address(ip_pack)
         try:
             msg_string = msg_data.decode(self._encoding)
@@ -39,7 +41,8 @@ class Deserializer:
 
 
 class MessageSplitter:
-    """ Класс начальной обработки входящих данных """
+    """Класс начальной обработки входящих данных."""
+
     def __init__(self,
                  pack_format=PACK_FORMAT,
                  deserializer=Deserializer()):
@@ -48,7 +51,11 @@ class MessageSplitter:
         self._logger = logging.getLogger('server_log')
 
     def feed(self, data, ui_notifier=None, server_queue=None):
-        """ разбивает входящие данные на размер сообщения, ip клиента, port клиента и само сообщение """
-        msg_len, ip_pack, port, data_body = struct.unpack(self.pack_format, data)
-        data_body = data_body[:msg_len]
-        self.deserializer.on_msg(ip_pack=ip_pack, port=port, msg_data=data_body, ui_notifier=ui_notifier, server_queue=server_queue)
+        """Разбивает входящие данные на размер сообщения, ip клиента, port клиента и само сообщение."""
+        try:
+            msg_len, ip_pack, port, data_body = struct.unpack(self.pack_format, data)
+            data_body = data_body[:msg_len]
+            self.deserializer.on_msg(ip_pack=ip_pack, port=port, msg_data=data_body, ui_notifier=ui_notifier,
+                                     server_queue=server_queue)
+        except struct.error:
+            pass

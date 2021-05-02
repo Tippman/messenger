@@ -1,4 +1,5 @@
 ﻿""" Серверная часть """
+import datetime
 import sys
 from queue import Queue
 
@@ -11,6 +12,7 @@ from icecream import ic
 from sqlalchemy.orm import sessionmaker
 
 from db.client_db import ClientStorage, ClientHistoryStorage
+from lib.processors.message_dataclasses import SuccessServerMessage, ErrorClientMessage, P2PMessageReceive
 from lib.processors.message_sender import MessageSender
 from lib.variables import *
 from lib.processors.receive_message_processor import MessageSplitter
@@ -25,7 +27,7 @@ class Server:
         self.server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         self.server.setblocking(0)
         self.clients = []
-        self.nicknames = []
+        self.nicknames = {}  # dict with online clients {login: {ip:ip, port:port}, ... }
         self.msg_splitter = MessageSplitter()
         self.message_sender = MessageSender()
         self.send_buffer = self.message_sender.send_buffer
@@ -36,16 +38,17 @@ class Server:
         for client in self.clients:
             client.send(message)
 
-    def disconnect_socket(self, sock):
-        """ отключает сокет """
+    def disconnect_socket(self, sock, login=None):
+        """Отключает сокет. Удаляет инфо клиента из online словаря nicknames."""
         # TODO как получить адрес клиента если он отключился?
         self.logger.info('Client disconnected')
-        # index = self.clients.index(sock)
         sock.close()
+        if login:
+            try:
+                removable_addr = self.nicknames.pop(login)
+            except KeyError:
+                self.logger.info('Client %s already disconnected', login)
         if sock in self.clients:
-            ind = self.clients.index(sock)
-            # login = self.nicknames[ind]
-            # self.nicknames.remove(login)
             self.clients.remove(sock)
 
         # self.broadcast(f'Client {nickname} disconnected!'.encode(ENCODING_FORMAT))
@@ -87,8 +90,8 @@ class Server:
         session = Session()
         return session
 
-    def get_client_contacts(self, client_sock, addr):
-        """ запрос к БД и отправка списка контактов клиенту """
+    def get_client_contacts(self, client_sock, addr) -> None:
+        """Запрос к БД и отправка списка контактов клиенту."""
         self.logger.info('Getting client contact list %s', str(addr))
 
         client_sock.send('GET_CONTACTS'.encode(ENCODING_FORMAT))
@@ -98,19 +101,73 @@ class Server:
         client_sock.send(self.send_buffer.data[0])
         self.send_buffer.bytes_sent()
 
+    def get_socket_by_address(self, ip_addr, port):
+        """Возвращает сокет из списка подключенных клиентов. Если клиент оффлайн - возвращает None"""
+        for sock in self.clients:
+            sock_ip, sock_port = sock.getpeername()
+            if sock_ip == ip_addr and sock_port == port:
+                return sock
+        return None
+
+    def send_p2p_message(self, queue_item: dict) -> None:
+        """Обработка и отправка сообщений p2p.
+        Словарь с запросом заправляется из очереди сервера. Ответы отправителям отправляются отсюда."""
+        author_login = queue_item['author_login']
+        author_ip = str(queue_item['author_ip'])
+        author_port = queue_item['author_port']
+        target_login = queue_item['target_login']
+        message = queue_item['message']
+
+        if target_login in self.nicknames.keys():
+            self.logger.info('sending p2p message from "%s" to online client "%s"',
+                             author_login, target_login)
+            target_ip, target_port = self.nicknames[target_login].values()
+            target_sock = self.get_socket_by_address(target_ip, target_port)
+
+            # Формируем и упаковываем датакласс для отправки получателю
+            message_datacls_to_target = P2PMessageReceive(action='p2p_receive',
+                                                          time=str(datetime.datetime.now()),
+                                                          author=author_login,
+                                                          message=message)
+            self.message_sender.send(message_datacls_to_target)
+            if self.send_buffer.data:
+                message_data_to_target = self.send_buffer.data[0]
+                self.send_buffer.bytes_sent()
+                # Отправляем сообщение получателю
+                target_sock.send(message_data_to_target)
+
+            # Формируем ответ отправителю
+            response_datacls = SuccessServerMessage(
+                response=200,
+                time=str(datetime.datetime.now()),
+                alert=f'Message sent to client "{target_login}"')
+        else:
+            # Формируем ответ отправителю (получатель офлайн)
+            self.logger.info('sending p2p message from "%s" to client "%s" failed. Target is offline.',
+                             author_login, target_login)
+            response_datacls = ErrorClientMessage(
+                response=410,
+                time=str(datetime.datetime.now()),
+                error=f'Target client "{target_login}" is offline')
+
+        author_sock = self.get_socket_by_address(author_ip, author_port)
+        self.message_sender.send(response_datacls)
+        if self.send_buffer.data:
+            # Отправляем ответ автору сообщения
+            response_data = self.send_buffer.data[0]
+            self.send_buffer.bytes_sent()
+            author_sock.send(response_data)
+
     def server_queue_handler(self, stopper):
-        """ обработка очереди сервера (наполняется из message_handler) """
+        """Обработка очереди сервера (наполняется из message_handler)."""
         while not stopper.is_set():
             if not self.server_queue.empty():
                 queue_item = self.server_queue.get_nowait()
                 if isinstance(queue_item, dict):
                     try:
+
                         if queue_item['action'] == 'p2p':
-                            sock_ind = self.nicknames.index(queue_item['target_login'])
-                            target_sock = self.clients[sock_ind]
-                            target_ip, target_port = target_sock.getsockname()
-                            self.server.sendto(queue_item['message'].encode(ENCODING_FORMAT),
-                                               (target_ip, target_port))
+                            self.send_p2p_message(queue_item)
                         elif queue_item['action'] == 'disconnect':
                             ip_addr = str(queue_item['ip_addr'])
                             port = queue_item['port']
@@ -122,15 +179,19 @@ class Server:
                             client_login = queue_item['login']
                             ip_addr = str(queue_item['ip_addr'])
                             port = queue_item['port']
+                            # Добавляем данные клиента в словарь актиынх подключений
+                            self.nicknames[client_login] = {'ip': ip_addr, 'port': port}
                             for sock in self.clients:
                                 sock_ip, sock_port = sock.getsockname()
                                 if sock_ip == ip_addr and sock_port == port:
                                     self.get_client_contacts(sock, (ip_addr, port))
                                     self.logger.info('Success authorize client %s', client_login)
-                    except KeyError:
-                        self.logger.debug('Error while handling server queue. Key err.')
+                    except KeyError as e:
+                        self.logger.debug('Error while handling server queue. Key err: %s.', e)
                     except ValueError:
                         self.logger.debug('target is offline')
+                    except Exception:
+                        raise
 
     def run(self, event):
         """ основной поток обработки входящих соединений """
@@ -154,10 +215,7 @@ class Server:
                     self.msg_splitter.feed(data=request_data, server_queue=self.server_queue)
                     client.send(self.send_buffer.data[0])
                     self.send_buffer.bytes_sent()
-                    # self.disconnect_socket(client)
-                    # continue
-                # else:
-                #     self.authenticate_client(client_sock=client, addr=addr)
+
                 self.clients.append(client)
 
             except OSError:

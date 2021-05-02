@@ -56,7 +56,6 @@ class Client:
         while not stopper.is_set():
             try:
                 message = self.client.recv(MAX_MSG_SIZE)
-
                 if message == 'GET_CONTACTS'.encode(ENCODING_FORMAT):
                     self.logger.info('%s: Requesting client contact list', str(self.client.getsockname()))
 
@@ -69,8 +68,10 @@ class Client:
 
                 else:
                     # если получен ответ от сервера - передаем его обработчику
-                    self.logger.info('Client receive msg from server.')
+                    self.logger.info('Client %s:%s receive msg from server.', str(self.client_ip),
+                                     str(self.client_port))
                     self.msg_splitter.feed(message, self.ui_notifier)
+
             except OSError:
                 pass
             except Exception as e:

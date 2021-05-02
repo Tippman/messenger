@@ -112,7 +112,9 @@ class ServerMessageHandler:
         pass
 
     def on_peer(self, datacls, ip_addr, port, server_queue=None):
-        """ обработка сообщений p2p. оповещение сервера через очередь о необходимости отправки одному клиенту """
+        """Обработка сообщений p2p. Оповещение сервера через очередь о необходимости отправки одному клиенту.
+        Ответ сервера о результате выполнения запроса формируется в обрабоччике очереди сервера."""
+        self._logger.debug('Putting  p2p action to server queue.')
         server_queue.put({'action': 'p2p',
                           'author_login': datacls.author,
                           'author_ip': ip_addr,
@@ -208,8 +210,7 @@ class ServerMessageHandler:
 
 
 class ClientMessageHandler:
-    """ обработка сообщений от сервера на склиенте """
-
+    """Обработка сообщений от сервера на клиенте."""
     def __init__(self):
         self._client_logger = logging.getLogger('client_log')
 
@@ -222,10 +223,16 @@ class ClientMessageHandler:
     def status_409(self, datacls, ui_notifier=None):
         ui_notifier.notify_failed_register(error=datacls.error)
 
+    def status_410(self, datacls, ui_notifier=None):
+        ui_notifier.notify_sending_failed(datacls)
+
+    def catch_inbox_message(self, datacls, ui_notifier=None):
+        ui_notifier.notify_inbox_message(datacls)
+
 
 class MessageRouter:
-    """ Роутер сообщений. принимает dataclasses и направляет их в соответствующий обработчик
-        ServerHandler или ClientHandler """
+    """Роутер сообщений. принимает dataclasses и направляет их в соответствующий обработчик
+        ServerHandler или ClientHandler."""
 
     def __init__(self,
                  server_msg_handler=ServerMessageHandler(),
@@ -236,7 +243,7 @@ class MessageRouter:
         self._client_logger = logging.getLogger('client_log')
 
     def on_msg(self, datacls, ip_addr, port, ui_notifier=None, server_queue=None):
-        """ отправляет входящий dataclass в обработчик"""
+        """Отправляет входящий dataclass в обработчик."""
         try:
             # server routing
             if isinstance(datacls, AuthenticateMessage):
@@ -270,8 +277,6 @@ class MessageRouter:
                 self._server_logger.debug('Routing datacls RegisterMessage')
                 self.server_msg_handler.register(datacls, ip_addr, port, server_queue=server_queue)
 
-
-
             # client routing
             elif isinstance(datacls, SuccessServerMessage):
                 self._client_logger.debug('Routing datacls success')
@@ -287,6 +292,15 @@ class MessageRouter:
                 else:
                     self._client_logger.debug('Routing datacls errors')
                     # self.client_msg_handler.status_402(datacls, ui_notifier=ui_notifier)
+
+            elif isinstance(datacls, P2PMessageReceive):
+                self._client_logger.debug('Routing datacls Receive msg from user %s', datacls.author)
+                self.client_msg_handler.catch_inbox_message(datacls, ui_notifier=ui_notifier)
+
+            elif isinstance(datacls, ErrorClientMessage):
+                self._client_logger.debug('Routing datacls Error msg: %s', datacls.error)
+                self.client_msg_handler.status_410(datacls, ui_notifier=ui_notifier)
+
 
             # other messages
             else:

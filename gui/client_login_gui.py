@@ -44,9 +44,11 @@ class MainLoginWindow(QWidget):
             if isinstance(e, SuccessEvent):
                 self.logger.debug('catch success msg')
                 if e.response == 201:
+                    self.logger.info('New account created!')
                     self.errorArea.setText('New account created!')
                     self.hide_register_fields()
                 elif e.response == 200:
+                    self.logger.info('Success authorize!')
                     self.errorArea.setText('Success authorize!')
                     time.sleep(1)
                     self.close()

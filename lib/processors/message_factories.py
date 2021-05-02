@@ -19,6 +19,7 @@ class MessageFactory:
         self.msg_router = msg_router
         self._disconnector = disconnector
         self.logger = logging.getLogger('server_log')
+        self.client_logger = logging.getLogger('client_log')
 
     def on_msg(self, msg_dict, ip_addr, port, ui_notifier=None, server_queue=None):
         """ формирует датаклассы и передает в MessageRouter """
@@ -105,6 +106,15 @@ class MessageFactory:
                                            server_queue=server_queue)
 
                 # actions, отправленные cервером
+                elif action == 'p2p_receive':
+                    self.client_logger.debug('factoring "%s" dataclass for %s:%s', action, str(ip_addr), str(port))
+                    self.msg_router.on_msg(
+                        datacls=P2PMessageReceive(
+                            action=action,
+                            time=msg_dict['time'],
+                            author=msg_dict['author'],
+                            message=msg_dict['message']), ip_addr=ip_addr, port=port, ui_notifier=ui_notifier)
+
                 elif action == 'probe':
                     pass
 
@@ -143,8 +153,15 @@ class MessageFactory:
                                                         error='Wrong login or password')
                 self.msg_router.on_msg(datacls=response_dataclass, ip_addr=ip_addr, port=port, ui_notifier=ui_notifier)
             elif server_response == 409:
-                self.logger.debug('Factoring catch an error. Already exists.')
+                self.logger.debug('Factoring an error. Already exists.')
                 response_dataclass = ErrorServerMessage(response=409,
+                                                        time=msg_dict['time'],
+                                                        error=msg_dict['error'])
+                self.msg_router.on_msg(datacls=response_dataclass, ip_addr=ip_addr, port=port, ui_notifier=ui_notifier)
+
+            elif server_response == 410:
+                self.logger.debug('Factoring an error. Target is offline.')
+                response_dataclass = ErrorClientMessage(response=410,
                                                         time=msg_dict['time'],
                                                         error=msg_dict['error'])
                 self.msg_router.on_msg(datacls=response_dataclass, ip_addr=ip_addr, port=port, ui_notifier=ui_notifier)

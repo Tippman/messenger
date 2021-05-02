@@ -9,7 +9,7 @@ from lib.variables import ENGINE
 from logs import config_server_log
 import time
 
-from gui.gui_event_handlers import SuccessEvent, FailedAuthEvent
+from gui.gui_event_handlers import SuccessEvent, FailedAuthEvent, InboxMessage, FailedSendingMessage
 from pathlib import Path
 
 from PyQt5 import uic, QtCore
@@ -48,10 +48,13 @@ class MainChatWindow(QMainWindow):
     def event(self, e: QtCore.QEvent) -> bool:
         if e.type() == QtCore.QEvent.User:
             if isinstance(e, SuccessEvent):
-                self.logger.debug('catch success event')
-            elif isinstance(e, FailedAuthEvent):
-                self.logger.debug('catch failed auth')
-                # self.errorArea.setText('Wrong login or password!')
+                self.chat_logger.debug('catch success event')
+            elif isinstance(e, InboxMessage):
+                self.chat_logger.info('Catch inbox msg from %s', e.author)
+                self.chatHistoryList.addItem(f'{e.author}: {e.message}')
+            elif isinstance(e, FailedSendingMessage):
+                self.chat_logger.info('Error while sending message: %s', e.error)
+                self.chatHistoryList.addItem(e.error)
         return super().event(e)
 
     def set_chat_widget_signals(self):

@@ -36,6 +36,7 @@ def main():
     test_contacts = [
         AddContactMessage(action='add_contact', time='None', author='tippman', target_login='login3'),
         AddContactMessage(action='add_contact', time='None', author='tippman', target_login='login5'),
+        AddContactMessage(action='add_contact', time='None', author='login3', target_login='tippman'),
         AddContactMessage(action='add_contact', time='None', author='login3', target_login='login5'),
         AddContactMessage(action='add_contact', time='None', author='login4', target_login='tippman'),
     ]

@@ -53,6 +53,14 @@ class P2PMessage:
 
 
 @dataclass()
+class P2PMessageReceive:
+    action: str
+    time: str
+    author: str
+    message: str
+
+
+@dataclass()
 class AuthenticateMessage:
     action: str
     time: str
