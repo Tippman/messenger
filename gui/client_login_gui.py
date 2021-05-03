@@ -1,3 +1,4 @@
+"""Модуль управления виджетом логин-окна чата."""
 import logging
 import time
 
@@ -17,7 +18,7 @@ from PyQt5.QtWidgets import QMainWindow, QWidget
 
 
 class MainLoginWindow(QWidget):
-    """ класс-окно авторизациии клиента """
+    """Класс-окно авторизациии клиента."""
 
     def __init__(self, client):
         super().__init__()
@@ -39,7 +40,7 @@ class MainLoginWindow(QWidget):
         self.cancelRegistrationPushButton.hide()
 
     def event(self, e: QtCore.QEvent) -> bool:
-        """ обработка событий авторизации """
+        """Обработка событий авторизации."""
         if e.type() == QtCore.QEvent.User:
             if isinstance(e, SuccessEvent):
                 self.logger.debug('catch success msg')
@@ -64,14 +65,14 @@ class MainLoginWindow(QWidget):
         return super().event(e)
 
     def set_login_widget_signals(self):
-        """ установка сигналов логин-виджета"""
+        """Установка сигналов логин-виджета."""
         self.connectButton.clicked.connect(self.connect_to_server)
         self.registerPushButton.clicked.connect(self.show_register_fields)
         self.cancelRegistrationPushButton.clicked.connect(self.hide_register_fields)
         self.submitRegisterPushButton.clicked.connect(self.submit_register)
 
     def submit_register(self):
-        """ отправка формы регистрации и проверка паролей """
+        """Отправка формы регистрации и проверка паролей."""
         self.logger.debug('connecting to server, register')
         server_ip = self.addressLineEdit.text()
         server_port = self.portSpinBox.value()
@@ -91,7 +92,7 @@ class MainLoginWindow(QWidget):
             self.errorArea.setText('Enter the same passwords!')
 
     def show_register_fields(self):
-        """ открывает поля и кнопки для регистрации """
+        """Открывает поля и кнопки для регистрации."""
         self.errorArea.setText('')
         self.repeatPasswordLineEdit.show()
         self.repeatPasswordLabel.show()
@@ -101,7 +102,7 @@ class MainLoginWindow(QWidget):
         self.connectButton.hide()
 
     def hide_register_fields(self):
-        """ скрывает поля и кнопки для регистрации """
+        """Скрывает поля и кнопки для регистрации."""
         self.errorArea.setText('')
         self.repeatPasswordLineEdit.hide()
         self.repeatPasswordLabel.hide()
@@ -111,7 +112,7 @@ class MainLoginWindow(QWidget):
         self.connectButton.show()
 
     def connect_to_server(self):
-        """ устанавливает соедиение для зарегистрированных польхователей """
+        """Устанавливает соедиение для зарегистрированных пользователей."""
         self.logger.debug('connecting to server')
         self.errorArea.setText('')
         server_ip = self.addressLineEdit.text()

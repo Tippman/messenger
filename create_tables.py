@@ -1,3 +1,4 @@
+"""Модуль создания структуры БД и наполения ее тестовыми данными."""
 import hashlib
 import sqlite3
 
@@ -10,7 +11,12 @@ from sqlalchemy.orm import sessionmaker
 from sqlalchemy.exc import IntegrityError
 
 
-def get_hex_password(raw_password):
+def get_hex_password(raw_password: str) -> hex:
+    """Возвращает hex, полученный из *raw_password*.
+
+    :param raw_password: Строка-пароль.
+    :return: Hex пароля, полученный через hashlib.pbkdf2_hmac.
+    """
     return hashlib.pbkdf2_hmac(HASH_FUNC,
                                bytes(raw_password, encoding=ENCODING_FORMAT),
                                bytes(SALT, encoding=ENCODING_FORMAT),
@@ -18,6 +24,7 @@ def get_hex_password(raw_password):
 
 
 def main():
+    """Создание БД, структуры таблиц, сессии и наполнение тестовыми данными."""
     Base.metadata.create_all(ENGINE)
 
     Session = sessionmaker(bind=ENGINE)

@@ -1,4 +1,4 @@
-﻿""" Серверная часть """
+﻿"""Модуль управления сервером."""
 import datetime
 import sys
 from queue import Queue
@@ -8,7 +8,6 @@ from select import select
 import socket
 import threading
 
-from icecream import ic
 from sqlalchemy.orm import sessionmaker
 
 from db.client_db import ClientStorage, ClientHistoryStorage
@@ -20,6 +19,8 @@ from gui.server_gui import MainWindow
 
 
 class Server:
+    """Основной класс управления сервером."""
+
     def __init__(self, SERVER_ADDR):
         self.logger = logging.getLogger('server_log')
         self.SERVER_ADDR = SERVER_ADDR
@@ -27,19 +28,20 @@ class Server:
         self.server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         self.server.setblocking(0)
         self.clients = []
-        self.nicknames = {}  # dict with online clients {login: {ip:ip, port:port}, ... }
+        self.nicknames = {}  #: dict with online clients = {'login': {'ip':ip, 'port':port}, ... }
         self.msg_splitter = MessageSplitter()
         self.message_sender = MessageSender()
         self.send_buffer = self.message_sender.send_buffer
         self.server_queue = Queue()
 
-    def broadcast(self, message):
-        """ отправляет сообщение всем участникам """
-        for client in self.clients:
-            client.send(message)
+    def disconnect_socket(self, sock, login=None) -> None:
+        """Отключает сокет. Удаляет инфо клиента из online словаря nicknames.
 
-    def disconnect_socket(self, sock, login=None):
-        """Отключает сокет. Удаляет инфо клиента из online словаря nicknames."""
+        :param sock: Сокет клиента, который необходимо отключить.
+        :param login: Логин, который необходимо отключить. По умолчанию - None.
+        :type sock: file
+        :type login: str
+        """
         # TODO как получить адрес клиента если он отключился?
         self.logger.info('Client disconnected')
         sock.close()
@@ -51,18 +53,24 @@ class Server:
         if sock in self.clients:
             self.clients.remove(sock)
 
-        # self.broadcast(f'Client {nickname} disconnected!'.encode(ENCODING_FORMAT))
-
     def clients_read(self, r_sockets):
-        """ читает данные из сокетов, от которыз поступили запросы и скармливает их на обработку в message splitter"""
-        requests = {}
+        """Читает данные из сокетов, от которых поступили запросы,
+        скармливает их на обработку в :class:`lib.processors.receive_message_processor.MessageSplitter`
+        и записывает ответы.
+
+        :return: Возвращает словарь ответов клиентам, где ключ - сокет клиента, значение - ответ сервера.
+        :rtype: dict
+        :param r_sockets: Список сокетов, из которых получены данные.
+        :type r_sockets: list[file]
+        """
+        responses = {}
         for sock in r_sockets:
             try:
                 data = sock.recv(MAX_MSG_SIZE)  # читаем запакованные через struct данные
 
                 # скармливаем данные с целью выполнить действия и сформировать ответ клиентам
                 self.msg_splitter.feed(data=data, server_queue=self.server_queue)
-                requests[sock] = self.send_buffer.data[0]
+                responses[sock] = self.send_buffer.data[0]
                 self.send_buffer.bytes_sent()
             except IndexError:
                 # если буфер отправки пуст - ничего не делаем
@@ -70,10 +78,14 @@ class Server:
             except:
                 # удаляем сокет из переченя если клиент отключился
                 self.disconnect_socket(sock)
-        return requests
+        return responses
 
-    def clients_write(self, responses: dict, w_sockets):
-        """ направляет ответы в сокеты, доступные для записи """
+    def clients_write(self, responses: dict, w_sockets: list) -> None:
+        """Направляет ответы в сокеты, доступные для записи.
+
+        :param responses: Словарь ответов сервера клиентам, сформированных в
+        :param w_sockets: Список сокетов, доступных для получения ответов.
+        """
         try:
             for sock in w_sockets:
                 for author_sock, response in responses.items():
@@ -85,13 +97,22 @@ class Server:
 
     @staticmethod
     def create_db_connection():
-        """ return session """
+        """Создает соединение с БД.
+
+        :return: Возвращает объект сессии.
+        """
         Session = sessionmaker(bind=ENGINE)
         session = Session()
         return session
 
-    def get_client_contacts(self, client_sock, addr) -> None:
-        """Запрос к БД и отправка списка контактов клиенту."""
+    def get_client_contacts(self, client_sock, addr: tuple) -> None:
+        """Отправляет в *client_sock* action-запрос данных о получении списка контактов,
+        скармливает упакованные даннные в :class:`lib.processors.receive_message_processor.MessageSplitter`,
+        получает ответ и отправляет обратно клиенту.
+
+        :param client_sock: Сокет клиента, от которого поступил запрос.
+        :param addr: Кортеж из IP адреса и порта клиента, от которого поступил запрос.
+        """
         self.logger.info('Getting client contact list %s', str(addr))
 
         client_sock.send('GET_CONTACTS'.encode(ENCODING_FORMAT))
@@ -101,7 +122,7 @@ class Server:
         client_sock.send(self.send_buffer.data[0])
         self.send_buffer.bytes_sent()
 
-    def get_socket_by_address(self, ip_addr, port):
+    def get_socket_by_address(self, ip_addr: str, port: int):
         """Возвращает сокет из списка подключенных клиентов. Если клиент оффлайн - возвращает None"""
         for sock in self.clients:
             sock_ip, sock_port = sock.getpeername()
@@ -111,7 +132,15 @@ class Server:
 
     def send_p2p_message(self, queue_item: dict) -> None:
         """Обработка и отправка сообщений p2p.
-        Словарь с запросом заправляется из очереди сервера. Ответы отправителям отправляются отсюда."""
+        Словарь с запросом получен из очереди сервера *server_queue_handler* .
+        Ответы отправителям запросов направляются из данного метода.
+        Словарь с запросом *queue_item* десериализуется, проверяется наличие адресата в online clients через
+        словарь *Server.nicknames*. Если получатель online - ему напарвляется датакласс с сообщением отправителя.
+        Ответ о статусе отправки сообщения возвращается инициатору отправки.
+
+        :param queue_item: Словарь из обработчика очереди сервера.
+        :return: None
+        """
         author_login = queue_item['author_login']
         author_ip = str(queue_item['author_ip'])
         author_port = queue_item['author_port']
@@ -158,8 +187,11 @@ class Server:
             self.send_buffer.bytes_sent()
             author_sock.send(response_data)
 
-    def server_queue_handler(self, stopper):
-        """Обработка очереди сервера (наполняется из message_handler)."""
+    def server_queue_handler(self, stopper) -> None:
+        """Обработка очереди сервера (наполняется из :class:`lib.processors.message_handlers.ServerMessageHandler`).
+
+        :param stopper: Остановщик потока сервера.
+        """
         while not stopper.is_set():
             if not self.server_queue.empty():
                 queue_item = self.server_queue.get_nowait()
@@ -194,7 +226,10 @@ class Server:
                         raise
 
     def run(self, event):
-        """ основной поток обработки входящих соединений """
+        """Основной поток обработки входящих соединений.
+
+        :param event: Остановщик основного потока сервера.
+        """
         print('Server is listening...')
 
         self.server.bind(self.SERVER_ADDR)
@@ -243,10 +278,10 @@ if __name__ == "__main__":
     serv_thr = threading.Thread(target=server.run, args=(server_kill,))
     serv_thr.start()
 
-    # app = QApplication(sys.argv)
-    # mw = MainWindow()
-    # mw.show()
-    # app.exec_()
-    #
-    # server_kill.set()
-    # serv_thr.join()
+    app = QApplication(sys.argv)
+    mw = MainWindow()
+    mw.show()
+    app.exec_()
+
+    server_kill.set()
+    serv_thr.join()

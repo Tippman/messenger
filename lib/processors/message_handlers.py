@@ -1,13 +1,10 @@
 import hashlib
 import json
+from datetime import datetime
 
-from icecream import ic
 import logging
 
-from sqlalchemy import create_engine
-
 import logs.config_server_log
-from gui.gui_event_handlers import UiNotifier
 
 from lib.processors.message_sender import MessageSender
 from sqlalchemy.orm import sessionmaker
@@ -15,12 +12,12 @@ from sqlalchemy.orm import sessionmaker
 from lib.processors.disconnector import Disconnector
 from lib.processors.message_dataclasses import *
 from lib.variables import ENGINE, ENCODING_FORMAT, SALT, HASH_FUNC
-from db.base import Base
-from db.client_db import Client, ClientStorage, ClientHistoryStorage
+from db.client_db import ClientStorage, ClientHistoryStorage
 
 
 class ServerMessageHandler:
-    # обработка сообщений от клиента на сервере
+    """Класс-обработчик сообщений от клиента на сервере."""
+
     def __init__(self,
                  disconnector=Disconnector(),
                  message_sender=MessageSender()):
@@ -36,8 +33,11 @@ class ServerMessageHandler:
         pass
 
     def get_client_contacts(self, datacls, ip_addr=None, port=None):
-        """ делает запрос к БД для получения выборки контактов пользователя по логину.
-            Результат выборки уходит в Message Sender """
+        """Делает запрос к БД для получения выборки контактов пользователя по логину.
+        Результат выборки уходит в Message Sender.
+
+        :param datacls: Датакласс, собранный в MessageFactory.
+        """
         if self._client_storage.is_client_exist(datacls.author):
             client_contacts_list = self._client_storage.get_client_contacts(datacls.author)
 
@@ -50,8 +50,12 @@ class ServerMessageHandler:
             self._disconnector.disconnect(ip_addr, port, f'user with login "{datacls.author}" does not exists')
 
     def authenticate_client(self, datacls, ip_addr=None, port=None, server_queue=None):
-        """ проверяет данные авторизации клиента в БД,
-        в случае совпадения инициирует сборку сервера об успешной авторизации """
+        """Проверяет данные авторизации клиента в БД,
+        в случае совпадения инициирует сборку сообщения сервера об успешной авторизации.
+
+        :param datacls: Датакласс, собранный в MessageFactory.
+        :param server_queue: (Опционально). Очередь сервера. По умолчанию - None.
+        """
         hash_password = hashlib.pbkdf2_hmac(HASH_FUNC,
                                             bytes(datacls.password, encoding=ENCODING_FORMAT),
                                             bytes(SALT, encoding=ENCODING_FORMAT),
@@ -85,7 +89,11 @@ class ServerMessageHandler:
             self._disconnector.disconnect(ip_addr, port, server_queue=server_queue)
 
     def register(self, datacls, ip_addr, port, server_queue=None):
-        """ регистрация нового пользователя (создание hmac и занесение в БД) """
+        """Регистрация нового пользователя (создание hmac и занесение в БД).
+
+        :param datacls: Датакласс, собранный в MessageFactory.
+        :param server_queue: (Опционально). Очередь сервера. По умолчанию - None.
+        """
         login = datacls.author
         if self._client_storage.is_client_exist(login):
             self._logger.debug('Username %s already exists.', login)
@@ -113,7 +121,11 @@ class ServerMessageHandler:
 
     def on_peer(self, datacls, ip_addr, port, server_queue=None):
         """Обработка сообщений p2p. Оповещение сервера через очередь о необходимости отправки одному клиенту.
-        Ответ сервера о результате выполнения запроса формируется в обрабоччике очереди сервера."""
+        Ответ сервера о результате выполнения запроса формируется в обрабоччике очереди сервера.
+
+        :param datacls: Датакласс, собранный в MessageFactory.
+        :param server_queue: (Опционально). Очередь сервера. По умолчанию - None.
+        """
         self._logger.debug('Putting  p2p action to server queue.')
         server_queue.put({'action': 'p2p',
                           'author_login': datacls.author,
@@ -123,7 +135,10 @@ class ServerMessageHandler:
                           'message': datacls.message})
 
     def remove_contact_from_client(self, datacls, ip_addr, port):
-        """ удаляет контакт из clients_contacts """
+        """Удаляет контакт из clients_contacts.
+
+        :param datacls: Датакласс, собранный в MessageFactory.
+        """
         if self._client_storage.is_client_exist(datacls.target_login):
             current_client = self._client_storage.get_client(datacls.author)
             target_client = self._client_storage.get_client(datacls.target_login)
@@ -165,7 +180,10 @@ class ServerMessageHandler:
         self._message_sender.send(response_dataclass)
 
     def add_contact_to_client(self, datacls, ip_addr=None, port=None):
-        """ довавляет контакт из clients_contacts """
+        """Довавляет контакт в clients_contacts.
+
+        :param datacls: Датакласс, собранный в MessageFactory.
+        """
         if self._client_storage.is_client_exist(datacls.target_login):
             current_client = self._client_storage.get_client(datacls.author)
             target_client = self._client_storage.get_client(datacls.target_login)
@@ -210,7 +228,8 @@ class ServerMessageHandler:
 
 
 class ClientMessageHandler:
-    """Обработка сообщений от сервера на клиенте."""
+    """Обработка сообщений от сервера на клиенте. Перенаправление уведомлений в GUI."""
+
     def __init__(self):
         self._client_logger = logging.getLogger('client_log')
 
@@ -232,7 +251,7 @@ class ClientMessageHandler:
 
 class MessageRouter:
     """Роутер сообщений. принимает dataclasses и направляет их в соответствующий обработчик
-        ServerHandler или ClientHandler."""
+    ServerHandler или ClientHandler."""
 
     def __init__(self,
                  server_msg_handler=ServerMessageHandler(),

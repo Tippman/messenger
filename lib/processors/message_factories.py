@@ -1,5 +1,4 @@
-from icecream import ic
-
+"""Фабрика датаклассов для обработки клиентской и серверной частью."""
 from lib.processors.disconnector import Disconnector
 from lib.processors.message_dataclasses import *
 from lib.processors.message_handlers import MessageRouter
@@ -9,7 +8,7 @@ import logs.config_server_log
 
 
 class MessageFactory:
-    """ Фабрика датаклассов """
+    """Фабрика датаклассов."""
 
     def __init__(self,
                  action_list=ACTION_LIST,
@@ -21,8 +20,19 @@ class MessageFactory:
         self.logger = logging.getLogger('server_log')
         self.client_logger = logging.getLogger('client_log')
 
-    def on_msg(self, msg_dict, ip_addr, port, ui_notifier=None, server_queue=None):
-        """ формирует датаклассы и передает в MessageRouter """
+    def on_msg(self, msg_dict: dict, ip_addr, port: int, ui_notifier=None, server_queue=None):
+        """Формирует датаклассы на основании *action* или *response* в *msg_dict*.
+        Передает их в :class:`lib.processors.message_handlers.MessageRouter`.
+
+        :param msg_dict: Словарь с запросом клиента или ответом сервера.
+            Если есть ключ 'action' - это запрос клиента, 'response' - ответ сервера.
+        :param ip_addr: IPv4Address, полученный при десериализации данных.
+        :param port: Порт, полученный при десериализации данных.
+        :param ui_notifier: (Опционально). Объект класса UiNotifier. Уведомляет GUI клиента о событиях.
+        :param server_queue: (Опционально). Очередь сервера.
+        :type ui_notifier: :class:`gui.gui_event_handlers.UiNotifier`
+        :type server_queue: :class:`server.Server`
+        """
         try:
             action = msg_dict['action']
 

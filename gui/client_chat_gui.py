@@ -1,3 +1,4 @@
+"""Модуль управления виджетом главного окна чата."""
 import logging
 
 from PyQt5.QtCore import pyqtSignal
@@ -17,7 +18,7 @@ from PyQt5.QtWidgets import QMainWindow, QWidget
 
 
 class MainChatWindow(QMainWindow):
-    """ класс-окно чата клиента """
+    """Класс-окно чата клиента."""
     get_contacts_signal = pyqtSignal(tuple)
 
     def __init__(self, client):
@@ -41,7 +42,7 @@ class MainChatWindow(QMainWindow):
         self.render_contact_list()
 
     def render_contact_list(self):
-        """ загрузка списка контактов пользователя """
+        """Загрузка списка контактов пользователя."""
         client_contacts = self._client_storage.get_client_contacts(self.client.login)
         self.contactsListWidget.addItems(client_contacts)
 
@@ -58,9 +59,11 @@ class MainChatWindow(QMainWindow):
         return super().event(e)
 
     def set_chat_widget_signals(self):
+        """Установка сигналов виджета чата."""
         self.sendButton.clicked.connect(self.submit)
 
     def submit(self):
+        """Отправка сообщения."""
         target = self.contactsListWidget.currentItem().text()
         msg = self.messageLineEdit.text()
         self.chatHistoryList.addItem(f'{target}: {msg}')

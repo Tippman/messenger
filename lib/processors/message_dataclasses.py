@@ -1,5 +1,5 @@
+"""Модуль описания существующих датаклассов работы сервера и клиента."""
 from dataclasses import dataclass
-from datetime import datetime
 
 
 # сообщения отправляемые клиентом
