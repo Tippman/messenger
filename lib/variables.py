@@ -1,6 +1,6 @@
 """ Константы используемые в файлах проекта"""
-import logging
 import ipaddress
+import logging
 from pathlib import Path
 
 from sqlalchemy import create_engine
@@ -41,6 +41,7 @@ ACTION_LIST = [
     'join_group',
     'leave_group',
     'p2p',
+    'p2p_receive',
     'presence',
     'get_contacts',
     'add_contact',
@@ -52,6 +53,6 @@ ACTION_LIST = [
     'on_group',
 ]
 
-# TODO вынести соль в переменную окрудения сервера
+# TODO вынести соль в переменную окружения сервера
 SALT = 'secret_salt'
 HASH_FUNC = 'sha256'

@@ -1,24 +1,20 @@
-from datetime import datetime
+"""Модуль отключения клиента в случае ошибок в процессе обработки запросов."""
 import logging
+from datetime import datetime
+
 import logs.config_server_log
 
 
 class Disconnector:
+    """Класс-дисконнектор"""
+
     def __init__(self):
         self.logger = logging.getLogger('server_log')
         self.disconnect_flag = bool
         self.disconnect_response = {}
 
-    @property
-    def is_disconnected(self):
-        return self.disconnect_flag
-
-    @property
-    def get_disconnect_response(self):
-        return self.disconnect_response if self.is_disconnected else None
-
     def disconnect(self, ip_addr, port, error=None, server_queue=None):
-        """ возвращает ответ для отключения клиента """
+        """Наполняет очередь сервера запросами на отключение клиента."""
         if error:
             self.logger.error('Client %s %s disconnected. Catch an error: %s', ip_addr, port, error)
         else:

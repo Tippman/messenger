@@ -1,23 +1,24 @@
+"""Модуль управления виджетом логин-окна чата."""
 import logging
-import time
-
-from icecream import ic
-
-from lib.variables import ENCODING_FORMAT
-from logs import config_server_log
 import threading
+import time
+from pathlib import Path
 from queue import Queue
 
-from gui.gui_event_handlers import SuccessEvent, FailedAuthEvent, FailedRegisterEvent
-from lib.processors.client_message_factory.client_message_factory import ClientMessageFactory
-from pathlib import Path
-
-from PyQt5 import uic, QtCore
+from icecream import ic
+from PyQt5 import QtCore, uic
 from PyQt5.QtWidgets import QMainWindow, QWidget
+
+from gui.gui_event_handlers import (FailedAuthEvent, FailedRegisterEvent,
+                                    SuccessEvent)
+from lib.processors.client_message_factory.client_message_factory import \
+    ClientMessageFactory
+from lib.variables import ENCODING_FORMAT
+from logs import config_server_log
 
 
 class MainLoginWindow(QWidget):
-    """ класс-окно авторизациии клиента """
+    """Класс-окно авторизациии клиента."""
 
     def __init__(self, client):
         super().__init__()
@@ -39,14 +40,16 @@ class MainLoginWindow(QWidget):
         self.cancelRegistrationPushButton.hide()
 
     def event(self, e: QtCore.QEvent) -> bool:
-        """ обработка событий авторизации """
+        """Обработка событий авторизации."""
         if e.type() == QtCore.QEvent.User:
             if isinstance(e, SuccessEvent):
                 self.logger.debug('catch success msg')
                 if e.response == 201:
+                    self.logger.info('New account created!')
                     self.errorArea.setText('New account created!')
                     self.hide_register_fields()
                 elif e.response == 200:
+                    self.logger.info('Success authorize!')
                     self.errorArea.setText('Success authorize!')
                     time.sleep(1)
                     self.close()
@@ -62,14 +65,14 @@ class MainLoginWindow(QWidget):
         return super().event(e)
 
     def set_login_widget_signals(self):
-        """ установка сигналов логин-виджета"""
+        """Установка сигналов логин-виджета."""
         self.connectButton.clicked.connect(self.connect_to_server)
         self.registerPushButton.clicked.connect(self.show_register_fields)
         self.cancelRegistrationPushButton.clicked.connect(self.hide_register_fields)
         self.submitRegisterPushButton.clicked.connect(self.submit_register)
 
     def submit_register(self):
-        """ отправка формы регистрации и проверка паролей """
+        """Отправка формы регистрации и проверка паролей."""
         self.logger.debug('connecting to server, register')
         server_ip = self.addressLineEdit.text()
         server_port = self.portSpinBox.value()
@@ -89,7 +92,7 @@ class MainLoginWindow(QWidget):
             self.errorArea.setText('Enter the same passwords!')
 
     def show_register_fields(self):
-        """ открывает поля и кнопки для регистрации """
+        """Открывает поля и кнопки для регистрации."""
         self.errorArea.setText('')
         self.repeatPasswordLineEdit.show()
         self.repeatPasswordLabel.show()
@@ -99,7 +102,7 @@ class MainLoginWindow(QWidget):
         self.connectButton.hide()
 
     def hide_register_fields(self):
-        """ скрывает поля и кнопки для регистрации """
+        """Скрывает поля и кнопки для регистрации."""
         self.errorArea.setText('')
         self.repeatPasswordLineEdit.hide()
         self.repeatPasswordLabel.hide()
@@ -109,7 +112,7 @@ class MainLoginWindow(QWidget):
         self.connectButton.show()
 
     def connect_to_server(self):
-        """ устанавливает соедиение для зарегистрированных польхователей """
+        """Устанавливает соедиение для зарегистрированных пользователей."""
         self.logger.debug('connecting to server')
         self.errorArea.setText('')
         server_ip = self.addressLineEdit.text()

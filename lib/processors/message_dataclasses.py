@@ -1,5 +1,5 @@
+"""Модуль описания существующих датаклассов работы сервера и клиента."""
 from dataclasses import dataclass
-from datetime import datetime
 
 
 # сообщения отправляемые клиентом
@@ -49,6 +49,14 @@ class P2PMessage:
     time: str
     author: str
     target: str
+    message: str
+
+
+@dataclass()
+class P2PMessageReceive:
+    action: str
+    time: str
+    author: str
     message: str
 
 

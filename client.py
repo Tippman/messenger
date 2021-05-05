@@ -1,30 +1,32 @@
-﻿""" Клиентская часть """
+﻿"""Модуль управления клиентской частью."""
+import datetime
 import json
+import logging
+import socket
+import struct
+import sys
+import threading
 from queue import Queue
 from select import select
-import sys
-import socket
-import threading
-import datetime
-import struct
-import logging
 
+from icecream import ic
 from PyQt5.QtCore import QThread
 from PyQt5.QtWidgets import QApplication
 
 import logs.config_server_log
-from icecream import ic
-
 from gui.client_chat_gui import MainChatWindow
 from gui.client_login_gui import MainLoginWindow
 from gui.gui_event_handlers import UiNotifier
-from lib.processors.client_message_factory.client_message_factory import ClientMessageFactory
-from lib.processors.receive_message_processor import MessageSplitter
+from lib.processors.client_message_factory.client_message_factory import \
+    ClientMessageFactory
 from lib.processors.message_sender import Serializer
+from lib.processors.receive_message_processor import MessageSplitter
 from lib.variables import *
 
 
 class Client:
+    """Основной класс клиента."""
+
     def __init__(self,
                  SERVER_ADDR=None,
                  client_message_factory=ClientMessageFactory(),
@@ -47,12 +49,18 @@ class Client:
         self.client_thr_killer = None  # threading.Event()
         self.ui_notifier = ui_notifier
 
-    def disconnect(self):
+    def disconnect(self) -> None:
+        """Закрывает сокет клиента."""
         self.logger.info('disconnecting')
         self.client_thr_killer.set()
         self.client.close()
 
-    def receive(self, stopper):
+    def receive(self, stopper) -> None:
+        """Поток, принимающий входящие сообщения. Скармливает входящие данные в
+        :class:`lib.processors.receive_message_processor.MessageSplitter`.
+
+        :param stopper: Остановщик потока.
+        """
         while not stopper.is_set():
             try:
                 message = self.client.recv(MAX_MSG_SIZE)
@@ -69,7 +77,8 @@ class Client:
 
                 else:
                     # если получен ответ от сервера - передаем его обработчику
-                    self.logger.info('Client receive msg from server.')
+                    self.logger.info('Client %s:%s receive msg from server.', str(self.client_ip),
+                                     str(self.client_port))
                     self.msg_splitter.feed(message, self.ui_notifier)
             except OSError:
                 pass
@@ -77,26 +86,9 @@ class Client:
                 self.logger.error('Client catch an error: %s', e)
                 self.disconnect()
 
-    def write(self, stopper):
-        while not stopper.is_set():
-            try:
-                message = input("")
-                # если сообщение начинается с "решетки" значит это команда
-                if message.startswith('#'):
-                    # формируется соответствующий словарь
-                    # если get_message_data is None значит команда была введена неправильно
-                    get_message_data = self.client_msg_factory.feed(message)
-                    if get_message_data:
-                        data = self.serializer.pack_data(get_message_data, self.client_ip, self.client_port)
-                        self.client.send(data)
-                    else:
-                        print('Enter a correct command / message')
-                else:
-                    print('Message must starts with "@" - for p2p, or "#" - for command.')
-            except:
-                self.disconnect()
-
-    def run(self):
+    def run(self) -> None:
+        """Основной поток клиента. Устанавливает соединение с сервером,
+        запускает поток *receive* и *client_queue_handler*."""
         try:
             self.client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             self.client.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
@@ -106,9 +98,6 @@ class Client:
             receive_thread = threading.Thread(target=self.receive, args=(self.client_thr_killer,))
             receive_thread.start()
 
-            # write_tread = threading.Thread(target=self.write, args=(self.client_thr_killer,))
-            # write_tread.start()
-
             client_queue_handler = threading.Thread(target=self.client_queue_handler)
             client_queue_handler.start()
 
@@ -117,11 +106,12 @@ class Client:
         except:
             raise
 
-    def client_queue_handler(self):
-        """ обработка очереди клиента. Очередь пополняется из GUI """
+    def client_queue_handler(self) -> None:
+        """Обработчик очереди клиента. Очередь наполняется из GUI клиента."""
         while not self.client_thr_killer.is_set():
             if not self.client_queue.empty():
                 queue_item = self.client_queue.get_nowait()
+
                 if isinstance(queue_item, dict):
                     try:
                         action = queue_item['action']

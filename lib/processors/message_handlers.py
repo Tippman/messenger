@@ -1,26 +1,21 @@
 import hashlib
 import json
-
-from icecream import ic
 import logging
+from datetime import datetime
 
-from sqlalchemy import create_engine
-
-import logs.config_server_log
-from gui.gui_event_handlers import UiNotifier
-
-from lib.processors.message_sender import MessageSender
 from sqlalchemy.orm import sessionmaker
 
+import logs.config_server_log
+from db.client_db import ClientHistoryStorage, ClientStorage
 from lib.processors.disconnector import Disconnector
 from lib.processors.message_dataclasses import *
-from lib.variables import ENGINE, ENCODING_FORMAT, SALT, HASH_FUNC
-from db.base import Base
-from db.client_db import Client, ClientStorage, ClientHistoryStorage
+from lib.processors.message_sender import MessageSender
+from lib.variables import ENCODING_FORMAT, ENGINE, HASH_FUNC, SALT
 
 
 class ServerMessageHandler:
-    # обработка сообщений от клиента на сервере
+    """Класс-обработчик сообщений от клиента на сервере."""
+
     def __init__(self,
                  disconnector=Disconnector(),
                  message_sender=MessageSender()):
@@ -36,8 +31,11 @@ class ServerMessageHandler:
         pass
 
     def get_client_contacts(self, datacls, ip_addr=None, port=None):
-        """ делает запрос к БД для получения выборки контактов пользователя по логину.
-            Результат выборки уходит в Message Sender """
+        """Делает запрос к БД для получения выборки контактов пользователя по логину.
+        Результат выборки уходит в Message Sender.
+
+        :param datacls: Датакласс, собранный в MessageFactory.
+        """
         if self._client_storage.is_client_exist(datacls.author):
             client_contacts_list = self._client_storage.get_client_contacts(datacls.author)
 
@@ -50,8 +48,12 @@ class ServerMessageHandler:
             self._disconnector.disconnect(ip_addr, port, f'user with login "{datacls.author}" does not exists')
 
     def authenticate_client(self, datacls, ip_addr=None, port=None, server_queue=None):
-        """ проверяет данные авторизации клиента в БД,
-        в случае совпадения инициирует сборку сервера об успешной авторизации """
+        """Проверяет данные авторизации клиента в БД,
+        в случае совпадения инициирует сборку сообщения сервера об успешной авторизации.
+
+        :param datacls: Датакласс, собранный в MessageFactory.
+        :param server_queue: (Опционально). Очередь сервера. По умолчанию - None.
+        """
         hash_password = hashlib.pbkdf2_hmac(HASH_FUNC,
                                             bytes(datacls.password, encoding=ENCODING_FORMAT),
                                             bytes(SALT, encoding=ENCODING_FORMAT),
@@ -85,7 +87,11 @@ class ServerMessageHandler:
             self._disconnector.disconnect(ip_addr, port, server_queue=server_queue)
 
     def register(self, datacls, ip_addr, port, server_queue=None):
-        """ регистрация нового пользователя (создание hmac и занесение в БД) """
+        """Регистрация нового пользователя (создание hmac и занесение в БД).
+
+        :param datacls: Датакласс, собранный в MessageFactory.
+        :param server_queue: (Опционально). Очередь сервера. По умолчанию - None.
+        """
         login = datacls.author
         if self._client_storage.is_client_exist(login):
             self._logger.debug('Username %s already exists.', login)
@@ -112,7 +118,13 @@ class ServerMessageHandler:
         pass
 
     def on_peer(self, datacls, ip_addr, port, server_queue=None):
-        """ обработка сообщений p2p. оповещение сервера через очередь о необходимости отправки одному клиенту """
+        """Обработка сообщений p2p. Оповещение сервера через очередь о необходимости отправки одному клиенту.
+        Ответ сервера о результате выполнения запроса формируется в обрабоччике очереди сервера.
+
+        :param datacls: Датакласс, собранный в MessageFactory.
+        :param server_queue: (Опционально). Очередь сервера. По умолчанию - None.
+        """
+        self._logger.debug('Putting  p2p action to server queue.')
         server_queue.put({'action': 'p2p',
                           'author_login': datacls.author,
                           'author_ip': ip_addr,
@@ -121,7 +133,10 @@ class ServerMessageHandler:
                           'message': datacls.message})
 
     def remove_contact_from_client(self, datacls, ip_addr, port):
-        """ удаляет контакт из clients_contacts """
+        """Удаляет контакт из clients_contacts.
+
+        :param datacls: Датакласс, собранный в MessageFactory.
+        """
         if self._client_storage.is_client_exist(datacls.target_login):
             current_client = self._client_storage.get_client(datacls.author)
             target_client = self._client_storage.get_client(datacls.target_login)
@@ -163,7 +178,10 @@ class ServerMessageHandler:
         self._message_sender.send(response_dataclass)
 
     def add_contact_to_client(self, datacls, ip_addr=None, port=None):
-        """ довавляет контакт из clients_contacts """
+        """Довавляет контакт в clients_contacts.
+
+        :param datacls: Датакласс, собранный в MessageFactory.
+        """
         if self._client_storage.is_client_exist(datacls.target_login):
             current_client = self._client_storage.get_client(datacls.author)
             target_client = self._client_storage.get_client(datacls.target_login)
@@ -208,7 +226,7 @@ class ServerMessageHandler:
 
 
 class ClientMessageHandler:
-    """ обработка сообщений от сервера на склиенте """
+    """Обработка сообщений от сервера на клиенте. Перенаправление уведомлений в GUI."""
 
     def __init__(self):
         self._client_logger = logging.getLogger('client_log')
@@ -222,10 +240,16 @@ class ClientMessageHandler:
     def status_409(self, datacls, ui_notifier=None):
         ui_notifier.notify_failed_register(error=datacls.error)
 
+    def status_410(self, datacls, ui_notifier=None):
+        ui_notifier.notify_sending_failed(datacls)
+
+    def catch_inbox_message(self, datacls, ui_notifier=None):
+        ui_notifier.notify_inbox_message(datacls)
+
 
 class MessageRouter:
-    """ Роутер сообщений. принимает dataclasses и направляет их в соответствующий обработчик
-        ServerHandler или ClientHandler """
+    """Роутер сообщений. принимает dataclasses и направляет их в соответствующий обработчик
+    ServerHandler или ClientHandler."""
 
     def __init__(self,
                  server_msg_handler=ServerMessageHandler(),
@@ -236,7 +260,12 @@ class MessageRouter:
         self._client_logger = logging.getLogger('client_log')
 
     def on_msg(self, datacls, ip_addr, port, ui_notifier=None, server_queue=None):
-        """ отправляет входящий dataclass в обработчик"""
+        """Отправляет входящий dataclass в обработчик.
+
+        :param datacls: Датакласс, собранный в MessageFactory.
+        :param ui_notifier: Объект класса UiNotifier. Опционально.
+        :param server_queue: Очередь сервера. Опционально.
+        """
         try:
             # server routing
             if isinstance(datacls, AuthenticateMessage):
@@ -270,8 +299,6 @@ class MessageRouter:
                 self._server_logger.debug('Routing datacls RegisterMessage')
                 self.server_msg_handler.register(datacls, ip_addr, port, server_queue=server_queue)
 
-
-
             # client routing
             elif isinstance(datacls, SuccessServerMessage):
                 self._client_logger.debug('Routing datacls success')
@@ -287,6 +314,15 @@ class MessageRouter:
                 else:
                     self._client_logger.debug('Routing datacls errors')
                     # self.client_msg_handler.status_402(datacls, ui_notifier=ui_notifier)
+
+            elif isinstance(datacls, P2PMessageReceive):
+                self._client_logger.debug('Routing datacls Receive msg from user %s', datacls.author)
+                self.client_msg_handler.catch_inbox_message(datacls, ui_notifier=ui_notifier)
+
+            elif isinstance(datacls, ErrorClientMessage):
+                self._client_logger.debug('Routing datacls Error msg: %s', datacls.error)
+                self.client_msg_handler.status_410(datacls, ui_notifier=ui_notifier)
+
 
             # other messages
             else:

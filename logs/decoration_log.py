@@ -1,12 +1,11 @@
 """Декораторы"""
 
-import sys
-import logging
 import inspect
+import logging
+import sys
 from functools import wraps
 
 import logs.config_server_log
-import logs.config_client_log
 
 if sys.argv[0].rfind('server') > 0:
     # имя скрипта содержит server, значит это сервер

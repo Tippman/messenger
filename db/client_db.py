@@ -1,13 +1,15 @@
+"""Модуль описания структур таблиц и управления БД."""
 from datetime import datetime
 from hmac import compare_digest
 
-from sqlalchemy import Column, Integer, String, select, DateTime, ForeignKey, Table, Boolean
+from sqlalchemy import (Boolean, Column, DateTime, ForeignKey, Integer, String,
+                        Table, select)
 from sqlalchemy.exc import IntegrityError
-from sqlalchemy.orm import relationship, relation, backref
+from sqlalchemy.orm import backref, relation, relationship
 
 from db.base import Base
 
-#  таблица конатктов пользователей
+#  таблица контактов пользователей
 clients_contacts = Table(
     'clients_contacts', Base.metadata,
     Column('client_id', Integer, ForeignKey('users.id')),
@@ -35,41 +37,57 @@ class Client(Base):
 
 
 class ClientStorage:
+    """Класс управления данными в таблице *users*."""
+
     def __init__(self, session):
         self._session = session
 
     def get_all_clients(self):
-        """ получить список всех пользователей """
+        """Получить список всех пользователей.
+
+        :return: Список всех пользователей (SQL-объекты).
+        """
         return self._session.query(Client).all()
 
     def get_client_contacts(self, login) -> list:
-        """ возвращает список контактов (логинов) пользователя """
+        """Возвращает список контактов (логинов) пользователя."""
         client = self.get_client(login)
         return [contact.login for contact in client.contacts.all()]
 
     def is_client_exist(self, login) -> bool:
-        """ проверяет есть ли клиент в базе """
+        """Проверяет есть ли клиент в базе.
+
+        :return: True если клиент есть в базе, иначе False.
+        """
         return True if self.get_client(login) else False
 
     def delete_client(self, login) -> None:
-        """ удаляет клиента из базы """
+        """Удаляет клиента из базы."""
         pass
 
-    def get_client(self, login) -> object:
-        """ возвращает объект пользователя """
+    def get_client(self, login):
+        """Возвращает объект пользователя."""
         user = select(Client).where(Client.login == login)
         result = self._session.execute(user)
         return result.scalars().first()
 
-    def add_client(self, login, hash_password) -> None:
-        """ добавляет клиента в БД или выбрасывет исключение если такой клиент уже есть """
+    def add_client(self, login: str, hash_password: hex) -> None:
+        """Добавляет клиента в БД или выбрасывет исключение если такой клиент уже есть.
+
+        :param login: Логин нового клиента.
+        :param hash_password: Hex пароля нового клиента.
+        """
         try:
             self._session.add(Client(login=login, password=hash_password))
         except IntegrityError:
             raise ValueError(f'User with login="{login}" already exists')
 
-    def check_auth_data(self, login, hash_password) -> bool:
-        """ проверяет логин и пароль при авторизации. Возвращает True если логин и пароль верные """
+    def check_auth_data(self, login: str, hash_password: hex) -> bool:
+        """Проверяет логин и пароль при авторизации. Возвращает True если логин и пароль верные.
+
+        :param login: Логин клиента.
+        :param hash_password: Hex пароля клиента.
+        """
         if self.is_client_exist(login):
             client = self.get_client(login)
             if client.login == login and compare_digest(client.password, hash_password):
@@ -93,12 +111,15 @@ class ClientHistory(Base):
 
 
 class ClientHistoryStorage:
+    """Класс управляющий таблицей *client_history*."""
+
     def __init__(self, session):
         self._session = session
 
-    def gef_all_records(self):
+    def gat_all_records(self):
+        """Возвращает все записи истории."""
         return self._session.query(ClientHistory).all()
 
-    def add_record(self, client_id, ip_address,
-                   time=datetime.now(), info=None):
+    def add_record(self, client_id, ip_address, time=datetime.now(), info=None):
+        """Добавляет запись в таблицу *client_history*."""
         self._session.add(ClientHistory(client_id=client_id, ip_address=ip_address, time=time, info=info))
