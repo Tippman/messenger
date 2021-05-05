@@ -1,16 +1,14 @@
 """Модуль инициализации GUI сервера."""
+import logging
 from pathlib import Path
 
-from PyQt5 import uic, QtCore
+from PyQt5 import QtCore, uic
 from PyQt5.QtWidgets import QMainWindow, QTableWidgetItem
 from sqlalchemy.orm import sessionmaker
 
-from lib.variables import ENGINE
-
-import logging
 import logs.config_server_log
-
-from db.client_db import ClientStorage, ClientHistoryStorage
+from db.client_db import ClientHistoryStorage, ClientStorage
+from lib.variables import ENGINE
 
 
 class MainWindow(QMainWindow):

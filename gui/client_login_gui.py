@@ -1,20 +1,20 @@
 """Модуль управления виджетом логин-окна чата."""
 import logging
-import time
-
-from icecream import ic
-
-from lib.variables import ENCODING_FORMAT
-from logs import config_server_log
 import threading
+import time
+from pathlib import Path
 from queue import Queue
 
-from gui.gui_event_handlers import SuccessEvent, FailedAuthEvent, FailedRegisterEvent
-from lib.processors.client_message_factory.client_message_factory import ClientMessageFactory
-from pathlib import Path
-
-from PyQt5 import uic, QtCore
+from icecream import ic
+from PyQt5 import QtCore, uic
 from PyQt5.QtWidgets import QMainWindow, QWidget
+
+from gui.gui_event_handlers import (FailedAuthEvent, FailedRegisterEvent,
+                                    SuccessEvent)
+from lib.processors.client_message_factory.client_message_factory import \
+    ClientMessageFactory
+from lib.variables import ENCODING_FORMAT
+from logs import config_server_log
 
 
 class MainLoginWindow(QWidget):

@@ -1,26 +1,26 @@
 ﻿"""Модуль управления клиентской частью."""
+import datetime
 import json
+import logging
+import socket
+import struct
+import sys
+import threading
 from queue import Queue
 from select import select
-import sys
-import socket
-import threading
-import datetime
-import struct
-import logging
 
+from icecream import ic
 from PyQt5.QtCore import QThread
 from PyQt5.QtWidgets import QApplication
 
 import logs.config_server_log
-from icecream import ic
-
 from gui.client_chat_gui import MainChatWindow
 from gui.client_login_gui import MainLoginWindow
 from gui.gui_event_handlers import UiNotifier
-from lib.processors.client_message_factory.client_message_factory import ClientMessageFactory
-from lib.processors.receive_message_processor import MessageSplitter
+from lib.processors.client_message_factory.client_message_factory import \
+    ClientMessageFactory
 from lib.processors.message_sender import Serializer
+from lib.processors.receive_message_processor import MessageSplitter
 from lib.variables import *
 
 

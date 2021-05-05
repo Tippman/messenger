@@ -1,20 +1,19 @@
 """Модуль управления виджетом главного окна чата."""
 import logging
+import time
+from pathlib import Path
 
-from PyQt5.QtCore import pyqtSignal
 from icecream import ic
+from PyQt5 import QtCore, uic
+from PyQt5.QtCore import pyqtSignal
+from PyQt5.QtWidgets import QMainWindow, QWidget
 from sqlalchemy.orm import sessionmaker
 
 from db.client_db import ClientStorage
+from gui.gui_event_handlers import (FailedAuthEvent, FailedSendingMessage,
+                                    InboxMessage, SuccessEvent)
 from lib.variables import ENGINE
 from logs import config_server_log
-import time
-
-from gui.gui_event_handlers import SuccessEvent, FailedAuthEvent, InboxMessage, FailedSendingMessage
-from pathlib import Path
-
-from PyQt5 import uic, QtCore
-from PyQt5.QtWidgets import QMainWindow, QWidget
 
 
 class MainChatWindow(QMainWindow):

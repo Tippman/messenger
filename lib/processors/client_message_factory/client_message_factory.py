@@ -1,6 +1,7 @@
 """Фабрика для сборки сообщений-запросов, оптравляемых клиентом."""
-from lib.processors.message_dataclasses import *
 import datetime
+
+from lib.processors.message_dataclasses import *
 
 
 class ClientMessageFactory:

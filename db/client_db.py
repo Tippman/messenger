@@ -2,9 +2,10 @@
 from datetime import datetime
 from hmac import compare_digest
 
-from sqlalchemy import Column, Integer, String, select, DateTime, ForeignKey, Table, Boolean
+from sqlalchemy import (Boolean, Column, DateTime, ForeignKey, Integer, String,
+                        Table, select)
 from sqlalchemy.exc import IntegrityError
-from sqlalchemy.orm import relationship, relation, backref
+from sqlalchemy.orm import backref, relation, relationship
 
 from db.base import Base
 

@@ -7,3 +7,4 @@ test.py
 test_pyqt.py
 logs/log_files
 messenger.sqlite3
+doc/_build

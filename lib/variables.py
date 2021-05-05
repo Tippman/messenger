@@ -1,6 +1,6 @@
 """ Константы используемые в файлах проекта"""
-import logging
 import ipaddress
+import logging
 from pathlib import Path
 
 from sqlalchemy import create_engine

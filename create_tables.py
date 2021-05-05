@@ -2,13 +2,14 @@
 import hashlib
 import sqlite3
 
-from db.client_db import *
+from sqlalchemy.exc import IntegrityError
+from sqlalchemy.orm import sessionmaker
+
 from db.base import Base
+from db.client_db import *
 from lib.processors.message_dataclasses import AddContactMessage
 from lib.processors.message_handlers import ServerMessageHandler
-from lib.variables import ENGINE, HASH_FUNC, ENCODING_FORMAT, SALT
-from sqlalchemy.orm import sessionmaker
-from sqlalchemy.exc import IntegrityError
+from lib.variables import ENCODING_FORMAT, ENGINE, HASH_FUNC, SALT
 
 
 def get_hex_password(raw_password: str) -> hex:

@@ -1,6 +1,7 @@
 """Модуль отключения клиента в случае ошибок в процессе обработки запросов."""
-from datetime import datetime
 import logging
+from datetime import datetime
+
 import logs.config_server_log
 
 

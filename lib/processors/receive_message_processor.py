@@ -1,13 +1,15 @@
-import struct
 import datetime
+import ipaddress
 import json
 import logging
-import logs.config_server_log
+import struct
+
 from icecream import ic
-from lib.variables import PACK_FORMAT, ENCODING_FORMAT
-import ipaddress
-from lib.processors.message_factories import MessageFactory
+
+import logs.config_server_log
 from lib.processors.disconnector import Disconnector
+from lib.processors.message_factories import MessageFactory
+from lib.variables import ENCODING_FORMAT, PACK_FORMAT
 
 
 class Deserializer:
@@ -26,7 +28,11 @@ class Deserializer:
 
     def on_msg(self, ip_pack: bytes = None, port: int = None, msg_data: bytes = None, ui_notifier=None,
                server_queue=None):
-        """Преобразует байты в словарь и отправляет его для сборки датакласса."""
+        """Преобразует байты в словарь и отправляет его для сборки датакласса.
+
+        :param ip_pack: Упакованный IP адрес в байтах.
+        :param msg_data: Данные сообщения в байтах.
+        """
         ip_addr = ipaddress.IPv4Address(ip_pack)
         try:
             msg_string = msg_data.decode(self._encoding)

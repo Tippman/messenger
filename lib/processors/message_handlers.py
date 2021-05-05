@@ -1,18 +1,16 @@
 import hashlib
 import json
+import logging
 from datetime import datetime
 
-import logging
-
-import logs.config_server_log
-
-from lib.processors.message_sender import MessageSender
 from sqlalchemy.orm import sessionmaker
 
+import logs.config_server_log
+from db.client_db import ClientHistoryStorage, ClientStorage
 from lib.processors.disconnector import Disconnector
 from lib.processors.message_dataclasses import *
-from lib.variables import ENGINE, ENCODING_FORMAT, SALT, HASH_FUNC
-from db.client_db import ClientStorage, ClientHistoryStorage
+from lib.processors.message_sender import MessageSender
+from lib.variables import ENCODING_FORMAT, ENGINE, HASH_FUNC, SALT
 
 
 class ServerMessageHandler:
@@ -262,7 +260,12 @@ class MessageRouter:
         self._client_logger = logging.getLogger('client_log')
 
     def on_msg(self, datacls, ip_addr, port, ui_notifier=None, server_queue=None):
-        """Отправляет входящий dataclass в обработчик."""
+        """Отправляет входящий dataclass в обработчик.
+
+        :param datacls: Датакласс, собранный в MessageFactory.
+        :param ui_notifier: Объект класса UiNotifier. Опционально.
+        :param server_queue: Очередь сервера. Опционально.
+        """
         try:
             # server routing
             if isinstance(datacls, AuthenticateMessage):

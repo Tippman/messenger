@@ -1,21 +1,22 @@
 ﻿"""Модуль управления сервером."""
 import datetime
+import socket
 import sys
+import threading
 from queue import Queue
+from select import select
 
 from PyQt5.QtWidgets import QApplication
-from select import select
-import socket
-import threading
-
 from sqlalchemy.orm import sessionmaker
 
-from db.client_db import ClientStorage, ClientHistoryStorage
-from lib.processors.message_dataclasses import SuccessServerMessage, ErrorClientMessage, P2PMessageReceive
-from lib.processors.message_sender import MessageSender
-from lib.variables import *
-from lib.processors.receive_message_processor import MessageSplitter
+from db.client_db import ClientHistoryStorage, ClientStorage
 from gui.server_gui import MainWindow
+from lib.processors.message_dataclasses import (ErrorClientMessage,
+                                                P2PMessageReceive,
+                                                SuccessServerMessage)
+from lib.processors.message_sender import MessageSender
+from lib.processors.receive_message_processor import MessageSplitter
+from lib.variables import *
 
 
 class Server:

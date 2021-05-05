@@ -1,10 +1,11 @@
 """Фабрика датаклассов для обработки клиентской и серверной частью."""
+import logging
+
+import logs.config_server_log
 from lib.processors.disconnector import Disconnector
 from lib.processors.message_dataclasses import *
 from lib.processors.message_handlers import MessageRouter
 from lib.variables import *
-import logging
-import logs.config_server_log
 
 
 class MessageFactory:
